@@ -2,7 +2,7 @@
 
 **An interactive geospatial intelligence dashboard mapping documented UFO/UAP sightings across Colorado's San Luis Valley.**
 
-Built by [James Keith Harwood II](https://github.com/sentinelaisystems) and Claude Sentinel (Anthropic) — a Sentinel AI Systems production, created through the SIDLF human-AI partnership framework.
+Built by [James Keith Harwood II](https://github.com/jkh2) and Claude Sentinel (Anthropic) — a Sentinel AI Systems production, created through the SIDLF human-AI partnership framework.
 
 ---
 
