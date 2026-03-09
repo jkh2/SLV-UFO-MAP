@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLV UFO Sighting Map — Sentinel AI Systems</title>
+<meta name="description" content="Interactive map of documented UFO sightings in Colorado's San Luis Valley. 107 documented reports from 1994-2019 with AI-powered analysis.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--green:#00ff66;--cyan:#00ccff;--orange:#ff8c00;--red:#ff4400;--purple:#bf5fff;
+  --bg:#0a0a0a;--panel:rgba(8,12,8,0.97);--border:rgba(255,255,255,0.1);}
+body{font-family:'JetBrains Mono','Fira Code','Courier New',monospace;background:var(--bg);color:#e0e0e0;overflow:hidden;height:100vh;width:100vw;}
+#map{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;}
+.leaflet-container{background:var(--bg)!important;}
+.leaflet-control-attribution{font-size:7px!important;opacity:.3!important;}
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:transparent!important;}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:transparent!important;}
+
+#header{position:absolute;top:0;left:0;right:0;z-index:1000;
+  background:linear-gradient(180deg,rgba(0,0,0,.94) 0%,rgba(0,0,0,.72) 70%,transparent 100%);
+  padding:12px 16px 22px;pointer-events:none;}
+#header>*{pointer-events:auto;}
+.hdr-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.hdr-title{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900;letter-spacing:2px;
+  background:linear-gradient(90deg,var(--green),var(--cyan),var(--orange));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hdr-sub{font-size:8px;opacity:.5;letter-spacing:1.5px;margin-top:1px;}
+.btn{border:none;padding:7px 14px;border-radius:4px;font-family:'Orbitron',sans-serif;
+  font-size:10px;font-weight:700;cursor:pointer;letter-spacing:1px;white-space:nowrap;transition:all .2s;}
+.btn:hover{transform:scale(1.03);}
+.btn-report{background:var(--orange);color:#000;box-shadow:0 0 12px rgba(255,140,0,.4);}
+.btn-report.cancel{background:var(--red);}
+.btn-ai{background:var(--purple);color:#fff;box-shadow:0 0 12px rgba(191,95,255,.4);}
+.btn-ai.active{background:var(--red);}
+
+.tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.tab{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  padding:3px 10px;border-radius:3px;font-family:inherit;font-size:9px;
+  font-weight:600;cursor:pointer;letter-spacing:1px;transition:all .15s;}
+.tab.active{color:#000;}
+.tab[data-c="green"]{color:var(--green);border-color:rgba(0,255,100,.15);}
+.tab[data-c="green"].active{background:var(--green);border-color:var(--green);}
+.tab[data-c="orange"]{color:var(--orange);border-color:rgba(255,140,0,.15);}
+.tab[data-c="orange"].active{background:var(--orange);border-color:var(--orange);}
+.tab[data-c="cyan"]{color:var(--cyan);border-color:rgba(0,200,255,.15);}
+.tab[data-c="cyan"].active{background:var(--cyan);border-color:var(--cyan);}
+
+.panel{position:absolute;bottom:16px;left:16px;right:16px;max-width:500px;z-index:1000;
+  border-radius:8px;max-height:48vh;overflow-y:auto;display:none;animation:slideUp .25s ease-out;}
+.panel.show{display:block;}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+.panel-doc{background:var(--panel);border:1px solid rgba(0,255,100,.4);box-shadow:0 0 25px rgba(0,255,100,.12);}
+.panel-user{background:rgba(12,8,0,.97);border:1px solid rgba(255,140,0,.5);box-shadow:0 0 25px rgba(255,140,0,.15);}
+.panel-stats{background:rgba(0,8,16,.96);border:1px solid rgba(0,200,255,.4);box-shadow:0 0 25px rgba(0,200,255,.12);max-width:360px;}
+.panel-inner{padding:14px;}
+.panel-close{background:none;border:none;color:#666;font-size:18px;cursor:pointer;padding:2px;float:right;}
+.panel-close:hover{color:#fff;}
+
+.detail-type{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;}
+.detail-type.doc{color:var(--green);}.detail-type.user{color:var(--orange);}
+.detail-loc{font-size:13px;font-weight:500;margin-top:3px;}
+.detail-meta{display:flex;gap:16px;margin-top:12px;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap;}
+.meta-label{font-size:7px;opacity:.4;letter-spacing:1px;}.meta-val{font-size:11px;color:#ccc;}.meta-val.sm{font-size:10px;color:#888;}
+.detail-desc-label{font-size:7px;opacity:.4;letter-spacing:1px;margin-bottom:3px;margin-top:10px;}
+.detail-desc{font-size:12px;line-height:1.65;color:#bbb;}
+
+.form-title{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--orange);letter-spacing:2px;margin-bottom:3px;}
+.form-hint{font-size:9px;opacity:.5;margin-bottom:12px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.form-grid .span2{grid-column:1/-1;}
+.form-label{font-size:7px;opacity:.4;letter-spacing:1px;display:block;margin-bottom:2px;}
+.fi,.form-select,.form-textarea{width:100%;background:rgba(255,255,255,.06);color:#e0e0e0;
+  border:1px solid rgba(255,140,0,.25);border-radius:4px;padding:6px 10px;font-size:12px;font-family:inherit;transition:border-color .2s;}
+.fi:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--orange);}
+.form-textarea{resize:vertical;}
+.btn-submit{margin-top:12px;width:100%;background:var(--orange);color:#000;border:none;
+  padding:9px;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:2px;}
+.btn-delete{margin-top:10px;background:rgba(255,0,0,.12);color:#ff4444;border:1px solid rgba(255,0,0,.25);padding:3px 10px;border-radius:3px;font-size:9px;cursor:pointer;font-family:inherit;}
+
+.stat-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:2px;margin-bottom:10px;}
+.stat-boxes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stat-box{border-radius:6px;padding:8px;text-align:center;}
+.stat-box.green{background:rgba(0,255,100,.08);}.stat-box.orange{background:rgba(255,140,0,.08);}
+.stat-num{font-size:20px;font-weight:700;}.stat-num.green{color:var(--green);}.stat-num.orange{color:var(--orange);}
+.stat-lbl{font-size:7px;opacity:.5;letter-spacing:1px;}
+.bar-label{font-size:10px;width:36px;color:var(--cyan);}
+.bar-track{flex:1;height:7px;background:rgba(255,255,255,.05);border-radius:3px;}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--green));}
+.bar-count{font-size:10px;width:22px;text-align:right;color:#888;}
+
+/* AI PANEL */
+#aiPanel{position:absolute;top:90px;right:16px;bottom:16px;width:400px;max-width:calc(100vw - 32px);
+  z-index:1001;background:rgba(10,4,20,0.97);border:1px solid rgba(191,95,255,.4);
+  border-radius:8px;box-shadow:0 0 30px rgba(191,95,255,.15);display:none;
+  flex-direction:column;animation:slideIn .25s ease-out;}
+#aiPanel.show{display:flex;}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+.ai-header{padding:10px 14px;border-bottom:1px solid rgba(191,95,255,.2);flex-shrink:0;}
+.ai-header-top{display:flex;align-items:center;gap:8px;}
+.ai-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--purple);letter-spacing:2px;}
+.ai-model-info{font-size:8px;opacity:.5;margin-top:2px;}
+
+/* Provider selector */
+.provider-row{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;}
+.prov-btn{padding:3px 8px;border-radius:3px;font-size:8px;font-family:inherit;font-weight:600;
+  cursor:pointer;letter-spacing:.5px;transition:all .15s;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);color:#999;}
+.prov-btn.active{color:#fff;border-color:var(--purple);background:rgba(191,95,255,.2);}
+.prov-btn:hover{border-color:rgba(191,95,255,.5);}
+
+.ai-messages{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+.ai-msg{font-size:12px;line-height:1.6;padding:10px 12px;border-radius:6px;max-width:95%;word-wrap:break-word;}
+.ai-msg.system{background:rgba(191,95,255,.1);color:#cba6ff;font-size:10px;align-self:center;text-align:center;}
+.ai-msg.user{background:rgba(0,255,100,.1);border:1px solid rgba(0,255,100,.2);color:#c0ffd0;align-self:flex-end;}
+.ai-msg.assistant{background:rgba(191,95,255,.08);border:1px solid rgba(191,95,255,.15);color:#ddd;align-self:flex-start;white-space:pre-wrap;}
+.ai-msg.error{background:rgba(255,0,0,.1);border:1px solid rgba(255,0,0,.2);color:#ff8888;font-size:11px;}
+.ai-msg.loading{color:#888;font-style:italic;font-size:11px;}
+.ai-input-row{padding:10px 14px;border-top:1px solid rgba(191,95,255,.2);display:flex;gap:8px;flex-shrink:0;}
+.ai-input{flex:1;background:rgba(255,255,255,.06);color:#e0e0e0;border:1px solid rgba(191,95,255,.3);
+  border-radius:4px;padding:8px 10px;font-size:12px;font-family:inherit;}
+.ai-input:focus{outline:none;border-color:var(--purple);}
+.ai-send{background:var(--purple);color:#fff;border:none;padding:8px 14px;border-radius:4px;
+  font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:1px;}
+.ai-send:disabled{opacity:.4;cursor:not-allowed;}
+.ai-footer{padding:6px 14px;border-top:1px solid rgba(191,95,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.ai-footer-btn{font-size:8px;color:#888;cursor:pointer;border:none;background:none;font-family:inherit;padding:2px 6px;border-radius:3px;}
+.ai-footer-btn:hover{color:var(--purple);background:rgba(191,95,255,.1);}
+
+/* Key overlay inside AI panel */
+.key-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(10,4,20,0.98);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;
+  border-radius:8px;z-index:2;}
+.key-overlay.hidden{display:none;}
+.key-overlay p{font-size:11px;color:#aaa;margin-bottom:12px;line-height:1.6;text-align:center;}
+.key-overlay a{color:var(--purple);}
+.key-input{width:100%;max-width:300px;background:rgba(255,255,255,.06);color:#e0e0e0;border:1px solid rgba(191,95,255,.3);
+  border-radius:4px;padding:8px 10px;font-size:11px;font-family:inherit;margin-bottom:8px;text-align:center;}
+.key-input:focus{outline:none;border-color:var(--purple);}
+.key-save-btn{background:var(--purple);color:#fff;border:none;padding:8px 24px;border-radius:4px;
+  font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:1px;margin-bottom:6px;}
+.key-skip{font-size:9px;color:#666;cursor:pointer;border:none;background:none;font-family:inherit;margin-top:4px;}
+.key-skip:hover{color:var(--purple);}
+
+#legend{position:absolute;bottom:16px;right:16px;z-index:1000;
+  background:rgba(0,0,0,.85);border-radius:6px;padding:8px 12px;border:1px solid var(--border);font-size:9px;}
+.legend-title{font-size:7px;opacity:.4;letter-spacing:1px;margin-bottom:4px;}
+.legend-row{display:flex;gap:5px;align-items:center;margin-bottom:2px;}
+.legend-dot{width:9px;height:9px;border-radius:50%;}
+.legend-dot.green{background:var(--green);box-shadow:0 0 5px var(--green);}
+.legend-dot.orange{background:var(--orange);box-shadow:0 0 5px var(--orange);}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.3);}
+::-webkit-scrollbar-thumb{background:rgba(191,95,255,.3);border-radius:3px;}
+
+@media(max-width:700px){
+  .hdr-title{font-size:12px;}
+  .panel{max-width:none;left:8px;right:8px;bottom:8px;max-height:52vh;}
+  #aiPanel{top:80px;right:8px;left:8px;width:auto;bottom:8px;}
+  #legend{display:none;}
+}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="header">
+  <div class="hdr-row">
+    <div style="font-size:26px">&#x1F6F8;</div>
+    <div style="min-width:0">
+      <div class="hdr-title">SAN LUIS VALLEY UFO MAP</div>
+      <div class="hdr-sub">SENTINEL AI SYSTEMS — <span id="docCount">107</span> DOCUMENTED &#x2022; <span id="userCount">0</span> USER REPORTS</div>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-ai" id="btnAI" onclick="toggleAI()">&#x1F916; ASK AI</button>
+    <button class="btn btn-report" id="btnReport" onclick="toggleForm()">&#xFF0B; REPORT</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-c="green" data-tab="doc" onclick="setTab('doc')">DOCUMENTED (<span id="docCountTab">107</span>)</button>
+    <button class="tab" data-c="orange" data-tab="user" onclick="setTab('user')">USER REPORTS (<span id="userCountTab">0</span>)</button>
+    <button class="tab" data-c="cyan" data-tab="stats" onclick="setTab('stats')">STATS</button>
+  </div>
+</div>
+
+<div class="panel panel-doc" id="detailPanel"><div class="panel-inner">
+  <button class="panel-close" onclick="closeDetail()">&times;</button>
+  <div class="detail-type" id="detailType"></div><div class="detail-loc" id="detailLoc"></div>
+  <div class="detail-meta" id="detailMeta"></div>
+  <div class="detail-desc-label">REPORT</div><div class="detail-desc" id="detailDesc"></div>
+  <div id="detailFooter"></div>
+</div></div>
+
+<div class="panel panel-user" id="formPanel"><div class="panel-inner">
+  <button class="panel-close" onclick="toggleForm()">&times;</button>
+  <div class="form-title">REPORT A SIGHTING</div>
+  <div class="form-hint">Click the map to set coordinates, or type them below.</div>
+  <div class="form-grid">
+    <div><label class="form-label">LATITUDE</label><input class="fi" id="fLat" placeholder="37.65"></div>
+    <div><label class="form-label">LONGITUDE</label><input class="fi" id="fLng" placeholder="-105.85"></div>
+    <div class="span2"><label class="form-label">LOCATION</label><input class="fi" id="fLoc" placeholder="e.g. Highway 17 near Moffat"></div>
+    <div><label class="form-label">DATE</label><input class="fi" id="fDate" placeholder="e.g. March 8, 2026"></div>
+    <div><label class="form-label">TIME</label><input class="fi" id="fTime" placeholder="e.g. 9:30 PM"></div>
+    <div><label class="form-label">DURATION</label><input class="fi" id="fDur" placeholder="e.g. 5 minutes"></div>
+    <div><label class="form-label">SHAPE</label>
+      <select class="form-select" id="fShape"><option>Unknown</option><option>Triangle</option><option>Disc</option><option>Sphere</option><option>Orb</option><option>Cigar</option><option>Cylinder</option><option>Light</option><option>Fireball</option><option>Star-like</option><option>Formation</option><option>Other</option></select>
+    </div>
+    <div class="span2"><label class="form-label">DESCRIPTION *</label><textarea class="form-textarea" id="fDesc" rows="4" placeholder="Describe what you saw..."></textarea></div>
+    <div><label class="form-label">YOUR NAME</label><input class="fi" id="fName" placeholder="Optional"></div>
+    <div><label class="form-label">EMAIL</label><input class="fi" id="fEmail" placeholder="Optional"></div>
+  </div>
+  <button class="btn-submit" onclick="submitReport()">SUBMIT SIGHTING REPORT</button>
+</div></div>
+
+<div class="panel panel-stats" id="statsPanel"><div class="panel-inner">
+  <div class="stat-title">STATISTICS</div>
+  <div class="stat-boxes">
+    <div class="stat-box green"><div class="stat-num green" id="statDoc">107</div><div class="stat-lbl">DOCUMENTED</div></div>
+    <div class="stat-box orange"><div class="stat-num orange" id="statUser">0</div><div class="stat-lbl">USER REPORTS</div></div>
+  </div>
+  <div style="font-size:8px;opacity:.4;letter-spacing:1px;margin-bottom:5px">BY DECADE</div>
+  <div id="decadeBars"></div>
+</div></div>
+
+<!-- AI PANEL -->
+<div id="aiPanel">
+  <div class="ai-header">
+    <div class="ai-header-top">
+      <div style="font-size:18px">&#x1F916;</div>
+      <div style="flex:1"><div class="ai-title">SLV SIGHTING ANALYST</div>
+        <div class="ai-model-info" id="aiModelInfo">Select a provider below</div>
+      </div>
+      <button class="panel-close" onclick="toggleAI()">&times;</button>
+    </div>
+    <div class="provider-row" id="providerRow"></div>
+  </div>
+
+  <!-- Key entry overlay -->
+  <div class="key-overlay" id="keyOverlay">
+    <div style="font-size:24px;margin-bottom:8px">&#x1F511;</div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:10px;color:var(--purple);letter-spacing:2px;margin-bottom:12px" id="keyProvLabel">API KEY</div>
+    <p id="keyProvHelp">Enter your API key below.</p>
+    <input type="password" class="key-input" id="keyInput" placeholder="sk-...">
+    <button class="key-save-btn" onclick="saveKey()">CONNECT</button>
+    <button class="key-skip" id="keySkipBtn" onclick="skipKey()" style="display:none">Skip — use without key (rate limited)</button>
+  </div>
+
+  <!-- Chat area -->
+  <div class="ai-messages" id="aiMessages">
+    <div class="ai-msg system">AI analyst loaded with all 107 documented SLV sightings. Ask me anything — patterns, locations, shapes, timelines, correlations.</div>
+  </div>
+  <div class="ai-input-row">
+    <input class="ai-input" id="aiInput" placeholder="Ask about the sightings..." onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendAI()">
+    <button class="ai-send" id="aiSendBtn" onclick="sendAI()">SEND</button>
+  </div>
+  <div class="ai-footer">
+    <span style="font-size:8px;opacity:.3" id="aiProvTag">—</span>
+    <div>
+      <button class="ai-footer-btn" onclick="clearChat()">&#x1F5D1; Clear</button>
+      <button class="ai-footer-btn" onclick="changeKey()">&#x1F511; Key</button>
+    </div>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="legend-title">LEGEND</div>
+  <div class="legend-row"><div class="legend-dot green"></div><span style="opacity:.7">Documented (<span id="legDoc">107</span>)</span></div>
+  <div class="legend-row"><div class="legend-dot orange"></div><span style="opacity:.7">User Report (<span id="legUser">0</span>)</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════
+//  SIGHTING DATA
+// ══════════════════════════════════════════════════════════════
+const SIGHTINGS = [
+{id:"D001",lat:38.05,lng:-106.1,date:`June 28, 2019`,location:`CO State Highway 285, South of Saguache, Saguache County`,description:`Flashing light from Center/Mosca headed NXNW toward Saguache, disc-shaped craft approximately 40-50 in size with a bright light revolving around the rim. Duration about 45 seconds to a minute. Two photographs taken.`},
+{id:"D002",lat:38.2094,lng:-105.8222,date:`September 7, 2007`,location:`Valley View Hot Springs, near Villa Grove, Saguache County`,description:`Bright star-like object fixed in the sky, almost directly overhead, appeared to zoom in and out of focus, took on a fuzzy comet-like look at times. Faded out after about two minutes. Original jpegs available.`},
+{id:"D003",lat:37.6186,lng:-105.5575,date:`August 17, 2007`,location:`Zapata Falls State Park, Alamosa County`,description:`Object Northwest of location, maintained steady course and speed similar to commercial jet, descended at 30-45 degrees, morphed or changed shape and appearance, lost behind mountain range north of park. Size at least 280 feet in length. Camera: Nikon D200 with 135mm zoom lens.`},
+{id:"D004",lat:39.0,lng:-106.3,date:`November 22, 2002`,location:`Presidential Mtns W of Buena Vista, Chaffee County`,description:`Cigar-shaped object, long way away 40-50 miles, constant 30 degrees above horizon, bright, no movement, no vapor trail. Videotape footage showed other objects like 2 bar-bells connecting main object, plasma field around main craft. Dimmed out slowly in about 15 seconds.`},
+{id:"D005",lat:37.99,lng:-105.69,date:`November 2, 2001`,location:`Baca Grande Development, Saguache County`,description:`Iridescent large green ball hovered low over Center area, larger than full moon, 25 degrees above horizon, drifted west, turned pale yellow and faded out. Watched for 3-4 minutes.`},
+{id:"D006",lat:37.9964,lng:-105.6997,date:`July 29, 2001`,location:`Crestone, Saguache County`,description:`Three unusual maneuvering lights above the Sangres, one larger than the other two.`},
+{id:"D007",lat:37.9964,lng:-105.6997,date:`July 21, 2001`,location:`Crestone, Saguache County`,description:`3 or 4 strange lights hovering over the Sangres, planet-sized, pulsing at each other, alternated white red and green, descended behind mountains. Lasted 4-5 minutes.`},
+{id:"D008",lat:38.0,lng:-105.9,date:`March 2, 2001`,location:`Road T Moffat, Saguache County`,description:`Small cigar-shaped UFO size of small Cessna plane, flew north-to-south toward Blanca, no tail, traveling too slowly for conventional plane, less than 1/4-mile away, 100 feet altitude, dull silver color, possible stubby wings, blinked out after 9-10 seconds. No wind, clear sky.`},
+{id:"D009",lat:37.9964,lng:-105.6997,date:`January 5, 2001`,location:`Crestone, Saguache County`,description:`Two unusually bright lights, one south and one west, visible for 2-3 minutes before fading.`},
+{id:"D010",lat:37.99,lng:-105.69,date:`January 5, 2001`,location:`Baca Grande Dev, Saguache County`,description:`Unusually bright multi-colored light hovering low east-by-southeast above Sangres, not corresponding to Sirius rising.`},
+{id:"D011",lat:38.0042,lng:-105.9061,date:`December 18, 2000`,location:`Moffat, Saguache County`,description:`Big yellowish-white light traveling slowly south over Moffat, under 500 feet, no FAA lighting, moving too slowly for low-flying plane. Watched 2-3 minutes.`},
+{id:"D012",lat:37.99,lng:-105.69,date:`December 17, 2000`,location:`Baca Grande Development, Saguache County`,description:`Pencil-shaped object hovering, ruddy reddish color, 15-20 feet long and 3-4 feet wide, between vantage and Sangre de Cristo Mountains. Followed by sonic boom.`},
+{id:"D013",lat:36.8714,lng:-105.8336,date:`December 13, 2000`,location:`CO/NM border by San Antonio Mtn, Taos/Conejos County`,description:`Large bright light 3/4 up San Antonio Mountain, 10 miles south of Antonito, faded out before confirmation.`},
+{id:"D014",lat:37.75,lng:-106.1,date:`November 2, 2000`,location:`South-Central Saguache County`,description:`Large iridescent green ball low in sky over Center area, 25 degrees above horizon, larger than full moon, sank and turned pale yellow. Watched 3-4 minutes.`},
+{id:"D015",lat:37.1,lng:-105.6,date:`October 19, 2000`,location:`North of Mesita, Costilla County`,description:`Orange glow from road northeast, moving south, cows agitated, dogs barking, too orange for headlights. Next morning unmarked black helicopter from south near Ute Mtn, 500 feet, no marks, headed toward lights. Repeated next morning.`},
+{id:"D016",lat:38.0042,lng:-105.9061,date:`September 3, 2000`,location:`Moffat, Saguache County`,description:`Low flying red light paced car east from Highway 17 and Road T through S curves to north near Road 65, taillight-sized, 15 feet off ground, no blinking.`},
+{id:"D017",lat:37.4,lng:-105.38,date:`July 29, 2000`,location:`Mountain Home Reservoir, Costilla County`,description:`7:45 PM: Highly-reflective object over SLV west, disappeared in seconds. 10:45 PM: Rapidly-flashing vivid blue and red lights east of Blanca Peak, jumping back and forth, two objects, then third/fourth purplish lights from east, erratic, pulsed rhythmically. Lasted 20 minutes.`},
+{id:"D018",lat:37.99,lng:-105.69,date:`July 19, 2000`,location:`Baca Grande Development, Saguache County`,description:`Extremely low-flying gunmetal colored 4-engine jet cargo plane, called C-17, tree-top level from north, dangerous low left turn above N. Crestone Creek, 100-200 feet, unusually quiet.`},
+{id:"D019",lat:37.0997,lng:-105.5989,date:`July 14, 2000`,location:`Near Mesita, Costilla County`,description:`Large black flat-bottomed armed military helicopter, under 100 feet above truck, heading south/southeast toward Ute Mountain area.`},
+{id:"D020",lat:37.9964,lng:-105.6997,date:`July 12, 2000`,location:`Crestone, Saguache County`,description:`Seven or 8 blinking lights in spherical formation, 15 degrees above western horizon, hovering over Valley, 10 miles away, alternated green red white, hovered then moved west then back east. Helicopter approached from west at 15,000 feet. Lasted 20-30 minutes.`},
+{id:"D021",lat:37.99,lng:-105.6,date:`July 1, 2000`,location:`Willow Lake, Rio Grande Nat Forest, Saguache County`,description:`Sausage-shaped light grey object, 10 feet long, no appendages, silent, south-to-north over Baca Grande Development, under conventional aircraft speed. Duration 20-30 seconds.`},
+{id:"D022",lat:37.75,lng:-105.55,date:`June 11, 2000`,location:`Highway 17, Great Sand Dunes Nat Mon, Saguache County`,description:`Round shape no fuselage or wings, dull metallic, moving as fast as jet, higher than low-flying jet with contrail.`},
+{id:"D023",lat:37.9964,lng:-105.6997,date:`June 10, 2000`,location:`Crestone, Saguache County`,description:`Huge wind shook tents briefly at 3:00 AM, woman with 3 triangle arrayed puncture marks on body.`},
+{id:"D024",lat:37.6,lng:-106.15,date:`May 24, 2000`,location:`Maxiville near the Rio Grande N of Monti Vista, Rio Grande County`,description:`Brilliant low flying light zig-zagging between La Garita Pk and old Del Norte Airport, silent. Next day dead calf with unusual hide scrape and cut along backbone.`},
+{id:"D025",lat:37.7,lng:-105.7,date:`March 23, 2000`,location:`Rd 6N east of the San Luis Lakes, Saguache County`,description:`Two low-flying triangle-shaped objects 20-25 ft long, zipped north to south, chased by 3 low-flying jet fighters. Witness checked for radiation by men with NSA badges.`},
+{id:"D026",lat:37.5,lng:-105.9,date:`March 17, 2000`,location:`Highway 285 Alamosa County`,description:`Metallic sphere at 1:00 position, 30 degrees up, no extraordinary movement, not like any airplane.`},
+{id:"D027",lat:38.0,lng:-105.6,date:`November 29, 1999`,location:`Sangre de Cristos, Saguache County`,description:`Yellow jet helicopter with two vertical black stripes on tail, flew up Sangres south-to-north at 11,000 feet.`},
+{id:"D028",lat:38.1,lng:-106.0,date:`November 23, 1999`,location:`Rd X and CC Rd 55, Saguache County`,description:`Loud whirring sound like prop wash of helicopter over car for 2-3 seconds, no sound associated, really close. Similar sound reported days ago.`},
+{id:"D029",lat:38.5,lng:-106.0,date:`November 15, 1999`,location:`Sangre de Cristo Mtns, Saguache & Chaffee Counties`,description:`Wingless white craft/plane north-to-south up Northern SLV, western perimeter of La Veta MOA, 17,000 feet, 6-7 miles away, silent, black bottom white top, similar to NASA space shuttle tail.`},
+{id:"D030",lat:37.6789,lng:-106.3534,date:`November 15, 1999`,location:`Del Norte, Rio Grande County`,description:`Strange bright multi-colored light pulsating over Sangres, not rising with planets and stars.`},
+{id:"D031",lat:37.6789,lng:-106.3534,date:`November 13, 1999`,location:`Del Norte, Rio Grande County`,description:`Large silent unmarked white aerial craft gliding south-to-north up Northern SLV, low 3,000 feet, no wings, vertical tail.`},
+{id:"D032",lat:38.8,lng:-106.05,date:`November 13, 1999`,location:`Highway 285 near Johnson’s Village, Saguache County`,description:`Unusual-looking silent white craft no wings, headed north by northwest up upper Arkansas River Valley toward Antero Reservoir, 2500-3000 feet.`},
+{id:"D033",lat:38.5347,lng:-105.9989,date:`November 12, 1999`,location:`Over Salida/Howard Area, Chaffee and Fremont Counties`,description:`Very bright pulsating light south of Salida, like brilliant strobe pulsing red white blue, 2-3X brighter than Venus, going up and down, joined by three smaller blinking white lights milling around, accompanied light north to NE.`},
+{id:"D034",lat:37.99,lng:-105.69,date:`November 10, 1999`,location:`Baca Grande Grants, Saguache County`,description:`6′ tall form darted left-to-right across window.`},
+{id:"D035",lat:37.8,lng:-105.8,date:`November 7, 1999`,location:`San Luis Valley, Saguache County`,description:`Eight large 4-engine jets over SLV northwest-to-southeast at 20,000 feet, four broke east of Blanca Pk toward NE, four continued east.`},
+{id:"D036",lat:38.44,lng:-105.02,date:`November 6, 1999`,location:`Canon City, Teller County`,description:`Bright light hovering over Penrose, videotaped appearing to break into three-then four lights.`},
+{id:"D037",lat:38.05,lng:-106.0,date:`October 30, 1999`,location:`Between Moffat and Saguache CO Rd X, Saguache County`,description:`Three cargo planes south-to-north over center of Valley toward Crestone Pk, turned northeast above mountains wrong way up MTR toward Salida, one dipped behind Sangres, two counter-clockwise loops around Hayden Pass, headed north then east around Poncha Pass.`},
+{id:"D038",lat:37.7325,lng:-105.5124,date:`October 13, 1999`,location:`Sangre de Cristo Mountains/Great Sand Dunes National Monument, Saguache, Alamosa Counties`,description:`Loud nauseatingly low hum or vibration, signs vibrating from sound.`},
+{id:"D039",lat:35.08,lng:-106.0,date:`September 26, 2000`,location:`I-40 40 miles E of Alburqurque, NM (regional, concurrent)`,description:`Huge triangle with bright white lights on corners, red in center, 10 stories wide 20 stories tall, slightly curved on top, glowing orange white.`},
+{id:"D040",lat:36.9,lng:-105.6,date:`September 3, 2000`,location:`Near Ute Mtn, south of Questa, NM (regional, concurrent)`,description:`Formation of 9 anomalous objects, 8 cylindrical 50′ long, blinking/pulsing at high speed north-to-south, 8-10,000 feet above valley floor, fuzzy energy field, one dipped downwards.`},
+{id:"D041",lat:38.1,lng:-105.3,date:`July 4, 1999`,location:`Rosita Hills, Custer County (regional, concurrent)`,description:`Four small shiny metallic objects flying fast and low north out in valley east of Sangres, turned into gulch north of Crestone, no sound.`},
+{id:"D042",lat:37.6,lng:-105.5,date:`July 3, 1999`,location:`Off Hwy. 150 between road 4S and 6N, Alamosa County`,description:`Pin of white light rapid rate parallel to mountains, stopped overhead, expanded into intense blue orb white center like propane flame flashlight size, disappeared.`},
+{id:"D043",lat:38.1347,lng:-105.4659,date:`February 21, 1999`,location:`Westcliffe, Custer County (regional, concurrent)`,description:`Two jet fighters W to E at 50,000 feet 1,000-1,500 mph, paced by rounded goldish object 10,000 feet below, no contrail. Faster than sound.`},
+{id:"D044",lat:36.5,lng:-105.3,date:`February 19, 1999`,location:`1/4 mile south of Black Lake, NM, Mora/Colfax Counties (regional, concurrent)`,description:`Two objects with brilliant white lights rose from Coyote Canyon, oscillating spinning, joined by four more, bounced around, headed to lake then up and over mountains. Silent, less than mile away.`},
+{id:"D045",lat:38.2,lng:-106.0,date:`February 9, 1999`,location:`Northern/Middle San Luis Valley, Saguache County`,description:`Fast moving unblinking dull-orange orb NW to SE over SLV, below 5,000 feet, 2-3X Venus size, covered 100 miles in 3 minutes.`},
+{id:"D046",lat:36.95,lng:-105.5,date:`January 22, 1999`,location:`2 miles S of Costilla, NM turnoff, Taos County (NM)`,description:`Large meteor descended, stopped, changed to reddish white, hovered 35,000-40,000 feet, figure-eights lateral movements, roar like jet with hum, headed SE overhead toward Taos.`},
+{id:"D047",lat:37.505,lng:-105.0094,date:`January 26, 1999`,location:`La Veta, Huerfano County`,description:`Large craft 600 feet hovering over golf course lake, wing no fuselage, bright lights front, translucent, low humming, orange portholes, ruby lights on wing tips, shot probe beam to water, flickering cloaking, red lights detached and flew off.`},
+{id:"D048",lat:37.7,lng:-105.55,date:`January 20, 1998`,location:`South of the Great Sand Dunes, Alamosa/Saguache County`,description:`Hooper resident reports watching a “big star doing some big twists.” Object/light was described as flashing “red-green and blue.” Witness described the multi-colored light as hovering for five or so minutes just south of the Sand Dunes Oasis. At around 6:15 pm, I witnessed two low flying jets headed from the east, over the Sangre de Cristos, south toward the location where the light was observed. Jets were flying under 3000 feet above the Valley floor. Witness claimed the object was not Sirius rising in the east. He claimed the “object” two times larger than the brightest planets, was 5 degrees north of Sirius the heaven’s brightest star,which he was able to identify.`},
+{id:"D049",lat:36.98,lng:-105.56,date:`January 17, 1998`,location:`South of Ute Mountain, Northern New Mexico/SLV`,description:`A bright light, high in the sky, was spotted by Thomas Paye in Mestia, CO; just north of the NM/CO border. The bright light was stationary for ten minutes, then headed west, before he and his girlfriend lost sight of it in the clouds.`},
+{id:"D050",lat:37.99,lng:-105.69,date:`January 8, 1998`,location:`Over the Baca Ranch, 2 miles east of mile marker 93 on State Highway 17 SLV CO`,description:`Two witnesses driving north on Highway 17 noticed a brightly blinking small light two miles to the east of their location. Observed a “150 foot diameter disc” with a small, low cupola, light was on underside. Object was plainly visible in dusk lighting. Appeared to be at “between 1500 to 2000 feet ” in altitude and traveling down the center of the SLV south by southwest. One witness estimated the speed at between “500 and 600 mph.” Two other cars on 17 may have also witnessed object. Duration of sighting about “30 seconds.”`},
+{id:"D051",lat:37.2,lng:-105.5,date:`January 8, 1998`,location:`Costilla County, SLV CO`,description:`Just last night my daughter and her friend and parent were coming home from basketball practice and mentioned that on Thursday night [Jan 8 ’98] the notice two lights emanating from the sky in the approximate location where the carcasses were discovered. She mentioned this before I told here about the discovery of the pigs.`},
+{id:"D052",lat:38.0,lng:-106.2,date:`November 30, 1997`,location:`SW corner pasture on Saguache County Road 61 and County Road C`,description:`A calf “mutilation” was reported by ranchers Bill Knopfman, Jack Kuntz and their foreman, Ted Ruggles. The 10-month old female calf, in a herd of approximately 40 cattle, was discovered with it’s right side mandible completely exposed with all hide and tissue removed. That morning, a dense fog blanketed the entire center portion of the SLV and the temperature was around 10 degrees. The apparent facial incision extended up and over the eye socket. Eye was removed. Tongue was intact. Rear-end coring 10″ in diameter. Apparent removal of reproductive tract to a (approximate) depth of 18″. Drop of blood observed on one teat. Uniform 4 to 5 inch snow cover over the entire pasture. Animal found lying on left-side. No down-side incisions noted. Calf was facing head to the south. Nearest dwelling about 400-450 yards away south by southwest of carcass. Only tracks observed were the victim animal’s own tracks. No additional evidence noted, i.e., blood, tissue, footprints, tire tracks, disturbed snow or vegetation. No known observation of attendant lights or sounds in the vicinity of site at time of death. Residents of nearest dwelling reported their dogs barking at around 5:30 to 6:00 a.m. Rancher’s dogs showed an interest in the carcass and evidently widened the rectum-coring shortly after calf’s discovery. Magpies and crows were observed on the calf at time of discovery. Some bird scavenging was noted, i.e., eye-socket and optic nerves scavenged. Tissue underneath incisional area showed some signs of being pecked at, but no observed scavenger action on hide at or on actual incisions. Three sets of samples were obtained for separate forensic testing.`},
+{id:"D053",lat:38.2,lng:-105.9,date:`November 29, 1997`,location:`Over Northern SLV`,description:`Four witnesses in the Baca watch a multi-colored light move slowly from center of the Valley toward the north.`},
+{id:"D054",lat:38.4033,lng:-106.2486,date:`October 13, 1997`,location:`SW of Mt Ouray near Marshall Pass`,description:`Two witnesses observe a bright orange light, about the size and brightness of Venus. Light, 5 degrees above the horizon to the NW, was seen from approximately 20-30 miles away. It blinked out quickly from left to right. Witnesses did not think the light was aircraft landing lights. Light appeared to be hovering in the same region as the October 4 sighting.`},
+{id:"D055",lat:37.0997,lng:-105.5989,date:`October 4, 1997`,location:`Mesita, CO`,description:`Mesita, CO resident Thomas Paye was driving home from Costilla–west on County Road 159 when he noticed a “silver cylinder” hanging in the western sky reflecting the setting sun. He said, “It looked like an average-sized jet, but it didn’t have any wings or a tail.” He arrived home and grabbed a pair of powerful binoculars and ran back outside to observe the object which was still hovering over the La Jara Reservoir area of the San Juan Mountains. “I watched for awhile then noticed it was heading back east toward the center of the [San Luis] Valley. According to Paye, at this point the object morphed into a brilliant “red dot,” then began to slowly descend. As it decended, “it turned into a “large silver metallic ball, like a hot air balloon,” but with no basket hanging underneath “. . . it looked like a giant ‘steely’ [ball bearing] hanging in the sky.” The dull silver-colored object continued descending into what Paye estimated was the Osier Park/Fox Creek area–10 miles west of Antonito, CO, 15-20 miles north of the Colorado/ New Mexico border. (This is where two mutilations were found last October with landing marks near the carcasses.) Paye’s sighting lasted from 6:45 pm to 7:53 pm. Duration: 53-54 minutes.`},
+{id:"D056",lat:37.7531,lng:-106.1086,date:`October 4, 1997`,location:`Center, CO`,description:`Resident Fabian Sauvo was out in his yard when he noticed three “red balls” of light hovering over Del Norte [CO]. One broke formation and began approaching Center, CO from the SE. “It was coming from over Del Norte and moving really slow. It flew right over the house–headed north” toward the Crestone area. Sauvo claimed the object was flying fairly low, and was not a satellite. During this time, the other two red lights were moving up/down, left to right, over Del Norte. Then Sauvo watched a fourth red ball of light appear over the Del Norte area, near the two hovering in tandem, and streak after the one that had broke formation. “It flew real fast chasing the first light. . . It was like a streak. It only took 4 or 5 seconds for it to fly across the whole Valley” [about 65 to 70 miles]. Duration of sighting 7:30 to 7:40 pm.`},
+{id:"D057",lat:38.4,lng:-106.0,date:`September 22, 1997`,location:`The Northern end of the San Luis Valley`,description:`For 15-20 minutes, blinking objects (choppers?) were seen escorting a very large, slow moving, orange/red globe west-to-east about 45 miles north of witnesses. This formation of four-to-five blinking lights, low over the mountains, was observed traveling from west-to-east over the Marshall Pass and Poncha Pass areas. Further south, around Villa Grove, at a higher elevation, a bright light hovered, flashing red and green. This larger/closer light then drifted north. Under nightvision, the two larger lights/objects appeared unusually bright. Two reports were filed with the Saguache County Sheriff’s Office. I was able to get up to the roof and see these object/lights. This area is not part of the low-level La Veta Military Operations area, or an official VTR flight corridor.`},
+{id:"D058",lat:37.1,lng:-105.7,date:`September 11, 1997`,location:`West of Mesita, CO`,description:`Two Mesita, CO witnesses observed two large craft, each with a row of six whiteish-orange lights, moving in unison. The craft, each estimated as being “a little longer than a [C-131] transport plane,” slowly drfted south over the South Pinon Hills, then stopped around the border and headed back north. After traveling north for about ten miles, they slowly began drfting west across the SLV, between Antonito and Romeo, CO. At no time did the objects travel faster than an estimated 40 mph. Duration of sighting: about 40 minutes.`},
+{id:"D059",lat:37.99,lng:-105.69,date:`September 12, 1997`,location:`Baca Grande Development`,description:`Two witnesses in the Baca Grande Development (north of theCO/NM border about 90 miles) claim to have watched a “huge craft hovering over the center of the [San Luis] Valley.” They described unblinking red and green lights that seemed to be arrayed around the object.`},
+{id:"D060",lat:37.99,lng:-105.69,date:`September 12, 1997`,location:`Baca Grande Development`,description:`I see a blueish cheap firework go down between me and the Sangres. Appeared to travel about 1/4 mile`},
+{id:"D061",lat:37.99,lng:-105.69,date:`September 12, 1997`,location:`Baca Grande Development`,description:`Two witnesses in the Baca Grande Development (north of theCO/NM border about 90 miles) claim to have watched a “huge craft hovering over the northeastern [San Luis] Valley.” They described unblinking red and green lights that seemed to be arrayed around the object.`},
+{id:"D062",lat:37.99,lng:-105.69,date:`September 12, 1997`,location:`Baca Grande Development`,description:`I see a blueish cheap firework go down between my vantage point and the Sangres. Appeared to travel about 1/4 mile. Duration: 2 seconds.`},
+{id:"D063",lat:37.0,lng:-106.0,date:`August 22, 1997`,location:`Over the Rio Grande River at the CO/NM Border`,description:`Three witnesses watched two lights that one witness reported looking like” huge car headlights” that were intermittently visible to the west in a “large thunderhead.” Then they also watched a large golden colored light that appeared low to the south by the border. Duration: about ten minutes. One of these witnesses, Thomas Peay, claimed to have then experienced three concurrent nights of lucid dreams featuring “aliens” and being “taken out through the window and aboard a small ship” which took him “up to a larger ship.” After the first night’s dream, the witness claimed “he knew they were coming back before he fell asleep.”`},
+{id:"D064",lat:38.4244,lng:-106.0861,date:`June 20, 1997`,location:`North of Villa Grove near Poncha Pass`,description:`A convoy of all-white vans and vehicles was seen, by a rancher hauling cattle, headed out of the Valley, on Highway 17–north of Villa Grove.`},
+{id:"D065",lat:37.47,lng:-105.88,date:`June 17, 1997`,location:`One-half-mile northwest of Alamosa, CO`,description:`All white convoys of vans, Suburbans and trucks–10 to 12 vehicles seen on (w/ State Patrol rear-escort) headed into Alamosa, the back way.`},
+{id:"D066",lat:38.2489,lng:-105.9492,date:`June 13, 1997`,location:`Near Villa Grove, CO`,description:`Received a sighting report from the NW part of the Valley by a witness headed north on 17. Said it was a reddish, flashing blue light, slightly bigger than a planet. Just hovered. Arcturis or Vega setting?`},
+{id:"D067",lat:37.48,lng:-105.87,date:`June 7, 1997`,location:`One-mile north of Alamosa on Highway 17`,description:`I saw a pick-up, on 17, the next day, just before 5:00 p.m., meandering up and down driveways a mile north of Alamosa. It had one of these space-gun looking things mounted in the back on the truck bed. The guys were in an unmarked brand-new Ford F-350, and they`},
+{id:"D068",lat:38.0,lng:-105.9,date:`August 21, 1994`,location:`Highway 17 & Moffat, Rio Grande County, CO`,description:`Two witnesses driving north on 17 witness a “low flying flashing light moving parallel to the highway. Later they see a an orange light moving east toward Crestone.”`},
+{id:"D069",lat:37.505,lng:-105.0094,date:`July 30, 1994`,location:`La Veta, Huerfano County, CO`,description:`Barbara Adkins reports an “orange light with a tail,” moving “really fast” S to N.`},
+{id:"D070",lat:36.65,lng:-105.4,date:`July 24, 1994`,location:`Moreno Valley/Eagles Nest NM, Taos County, NM`,description:`Eli Hronich finds another “mutilated” cow. As he examined the animal, a military-style chopper hovered over him. Occurred five days after Hronich was interviewed by “Sightings.”`},
+{id:"D071",lat:37.505,lng:-105.0094,date:`July 20, 1994`,location:`La Veta, Huerfano County, CO`,description:`Barbara Adkins observes helicopters in the area where a red pulsing light was seen the night before.`},
+{id:"D072",lat:37.505,lng:-105.0094,date:`July 19, 1994`,location:`La Veta CO, Huerfano County, CO`,description:`La Veta resident Barbara Adkins reported a “red pulsing light” near the Spanish Peaks.`},
+{id:"D073",lat:36.9031,lng:-106.5795,date:`July 19, 1994`,location:`Chama, NM`,description:`Woman awakes and sees a “gray” standing by baby in her bedroom. When she looked at it “it shuffled out of the room.” She went to a sliding glass door and sees a “sliver disc outside.”`},
+{id:"D074",lat:37.5,lng:-106.0,date:`July 13, 1994`,location:`Wyoming to New Mexico`,description:`Loud boom heard across most of central Colorado. Windows were reported broken in Denver. FEMA spokesperson John Spann claimed the boom was caused by a “NASA SR-71 Blackbird,” on a “classified mission.” State MUFON Director, Jim Nelson claims all 12 NASA SR-71’s had been grounded two-weeks ago because of “cracked tires.”`},
+{id:"D075",lat:37.99,lng:-105.69,date:`July 7, 1994`,location:`Baca Ranch, Saguache County, CO`,description:`4 witnesses in Crestone observe an “orange fireball” descend for 8 to 10 seconds W to E, through the clouds, over the Baca Ranch. 17 minutes later they called back to report two small unblinking white dots flying over the area where the fireball apparently went down.`},
+{id:"D076",lat:38.0,lng:-106.0,date:`July 6, 1994`,location:`Highway 17, Saguache County, CO`,description:`Two women witnesses traveling on 17 see and report a daylight sighting of a “bell-shaped sphere.”`},
+{id:"D077",lat:38.0,lng:-105.9,date:`July 4/5, 1994`,location:`Crestone/Moffat, Saguache County, CO`,description:`Objects that appeared to be “satellites” are observed traveling W to E with “jerking” motions.`},
+{id:"D078",lat:37.7325,lng:-105.5124,date:`July 3, 1994`,location:`Great Sand Dunes Oasis, Alamosa County, CO`,description:`A Great Sand Dunes Oasis was returning home from work when she observed an orangish-white light traveling slowly S to N at less than 500 feet in altitude. She stopped and watched it fly away.`},
+{id:"D079",lat:37.99,lng:-105.69,date:`June 30, 1994`,location:`Baca Grande, Saguache County, CO`,description:`Dan and Jonie Retuda and two friends observe 6 small lights traveling E to W traverse the sky with a “pulsing, zig-zag motion.” They were really high up but, “didn’t appear to be satellites. Two of the objects performed the motion “in tandam.”`},
+{id:"D080",lat:37.99,lng:-105.69,date:`June 30, 1994`,location:`Baca Grande, Saguache County, CO`,description:`Visiting UFOlogist, Gary Hart, audio tapes a vibrating utility pole at the junction of Highway 17 and Rd. “N.” Tape indicates complex multi-timbre sounds.`},
+{id:"D081",lat:38.0042,lng:-105.9061,date:`June 27, 1994`,location:`Moffat, CO and Highway 17, Saguache County, CO`,description:`Six witnesses (including Al and Donna Koon) witness “a triangular ship with no lights,” fly slowly overhead E to W. One witness stated, “It was so big, it blotted out the stars!” The craft seemed to be almost 15 degrees long in the sky. They claim they observed a smaller triangle following the first one. There were no clouds out and the object was “. . . well over 1000 feet up.”`},
+{id:"D082",lat:37.75,lng:-105.55,date:`June 16, 1994`,location:`Great Sand Dunes Rd. 151, Alamosa County, CO`,description:`Mike M. and Laura L. were driving north toward the Great Sand Dunes when they saw an “unusual orange light” directly ahead of them about 3/4 of a mile away. They stopped and watched it fly out over the valley and “vanish” to the NW. Muir said, “it was real close at one point, less than a mile away.”`},
+{id:"D083",lat:37.67,lng:-106.6398,date:`June 9, 1994`,location:`South Fork, CO near Rio Grande River, Rio Grande County, CO`,description:`Several residents of South Fork see and report to the Rio Grande County Sheriff a reddish light “zig-zagging over South Fork.”`},
+{id:"D084",lat:37.9964,lng:-105.6997,date:`June 5, 1994`,location:`Crestone, CO, Saguache County, CO`,description:`Two witnesses report a sizeable cheap firework display over town traveling E to W. It was reported as brilliant white and left a visible streak behind it.`},
+{id:"D085",lat:37.6,lng:-106.15,date:`June 5, 1994`,location:`North of Monte Vista, CO, Rio Grande County, CO`,description:`3 Saguache residents were traveling late up Highway 285 when they observed a”bright strobe-light pacing them to the west. Object appeared to be 50′ off the ground and traveling at least “60” mph. They stopped and watched as it disappeared off to the northwest.`},
+{id:"D086",lat:37.5,lng:-105.8,date:`June 1-3/8, 1994`,location:`Valley-wide, San Luis Valley`,description:`14 different helicopter reports filed by SLV witnesses. Most of the activity was reported as traveling N to S, or S to N up and down the Valley. One report featured a “huge white single-propped chopper” with a large rectangular box slung underneath. The box had several odd-looking antenas sticking out the front.`},
+{id:"D087",lat:38.0,lng:-105.7,date:`June 1, 1994`,location:`Sangres, near Crestone, CO, Saguache County, CO`,description:`George Oringdulph and myself observe a picket-line of four faint blinking lights over the Sangres, near Crestone, CO. while headed north on Highway 17. First observed lights near Rd. B. Three lights moved in a line west out into the valley. Fourth light remained behind over the mountains. Three minutes later a larger fifth light comes on and follows fourth light west along ten, or so miles behind the first three. After three or four minutes fifth light extinguishes like “in slow-motion” just east of Mofatt, CO.`},
+{id:"D088",lat:38.0875,lng:-106.1417,date:`June 1, 1994`,location:`Near witness's house, Saguache County, CO`,description:`George Oringdulph is awakened by the continuous roar of a large helicopter hovering low over his house. After going outside, chopper departs.`},
+{id:"D089",lat:37.99,lng:-105.69,date:`May 25, 1994`,location:`Baca Grande Development, Saguache County, CO`,description:`While on my second-story roof, I observe a beach-to-medicine ball-sized, white-ish-blue cheap firework while looking directly south out over the valley. Light appeared 30 degrees below the horizon and flared a mile and over Willow Creek light the tops of the trees at an altitude well below my vantage point. Uniform overcast clouds over entire central and northern part of the SLV. Duration 2 seconds.`},
+{id:"D090",lat:37.67,lng:-106.6398,date:`May 24, 1994`,location:`South Fork and Creede CO, Rio Grande County, CO`,description:`The Rio Grande Sheriff’s Office receives a report of a 20-30 minute sighting of a large silver sphere over the Rio Grande river. The witness claimed the object had light sequencing around the rim.`},
+{id:"D091",lat:37.5,lng:-106.2,date:`May 17, 1994`,location:`over Greenie Mountain, S of Monte Vista, Rio Grande County, CO`,description:`Monte Vista residents, Stephanie Malouff and Debbie Jiron report seeing a “huge bright light with lots of little bright lights around it.” They watched the larger object, which was “far too large” to be a conventional craft, flying in a northerly direction south of Monte. They noted that the larger object was being chased by a second smaller object at high speed. As the smaller object closed in on the larger one, it appeared to turn from bright white to red, as it “all of a sudden made a 45 degree turn to the west and disappeared over the mountains near Greenie.” Although both witnesses claimed the objects were silent, they heard a “pinging sound” like bullets “ricocheting” off metal.`},
+{id:"D092",lat:37.6,lng:-106.15,date:`May 9, 1994`,location:`Maxiville area, north on Monte Vista, Rio Grande County, CO`,description:`Brian Norton, while investigating the Maxiville area, sees a “dark unmarked helicopter” buzzing the area were a strange strobe light was seen on two preceding nights.`},
+{id:"D093",lat:37.6,lng:-106.15,date:`May 8, 1994`,location:`Rd 4N and 3W-north of Monte Vista, Rio Grande County, CO`,description:`Four more calls from witnesses of a “fast moving strobe light just above the trees and really moving.” According to Mark Hunter, “Cars were lined up (Highway 285) watching it.”`},
+{id:"D094",lat:37.6,lng:-106.15,date:`May 7, 1994`,location:`Rd. 4N and 3W-north of Monte Vista, Rio Grande County, CO`,description:`Two seperate calls by Monte Vista residents reporting a “fast moving strobe-light” north of Monte, near the Maxiville area. Undersheriff B. Norton observed light which appeared to “mirror” his actions.`},
+{id:"D095",lat:37.99,lng:-105.69,date:`May 5, 1994`,location:`Baca Ranch, Saguache County, CO`,description:`While in the Baca to conduct a CSETI training session, Dr. Steven Greer observed “a bright silver sphere” hovering over the Sangres while jogging. The object did not leave a vapor trail. The object hovered silently for “several minutes” before heading east over the mountains.`},
+{id:"D096",lat:38.0,lng:-105.7,date:`April 30, 1994`,location:`N. Crestone, Saguache County, CO`,description:`Local historian 75+yr old Jack Harlan sees “a large silver sphere” hovering over N. Crestone. He saw sequencing red and green lights that lit up the underside enough to show its shape and to reveal two raised ridges on the underside of the object. A second witness across the street saw a bright object streaking up and out to the SE at a 45 degree angle “just after 10:00 pm. Harlan claimed to be “unusually lethargic” the next day.`},
+{id:"D097",lat:38.0042,lng:-105.9061,date:`April 9, 1994`,location:`Moffat, Saguache County, CO`,description:`Koons see bright-orange light now joined by 3 others, same location as 2 nights prior.`},
+{id:"D098",lat:38.0042,lng:-105.9061,date:`April 7, 1994`,location:`La Garita that hovered about 30 degrees above the horizon before “blinking out.” Mofatt, CO, Saguache County, CO`,description:`Koon family sees a “large bright-orange light ” rising above the horizon in the west, just north of La Garita that hovered about 30 degrees above the horizon before “blinking out.”`},
+{id:"D099",lat:37.99,lng:-105.69,date:`April 2, 1994`,location:`Baca Development, Saguache County, CO`,description:`Two witnesses report an unusual “streak” very close to their location in the Baca Development.`},
+{id:"D100",lat:37.9964,lng:-105.6997,date:`April 1, 1994`,location:`Crestone, Saguache County, CO`,description:`“Cheap fireworks” reported by Crestone resident. Said object came down from the east at a steep angle within feet of his house.`},
+{id:"D101",lat:37.95,lng:-105.9,date:`March 30, 1994`,location:`Highway 17, four miles south of Mofatt, CO, Saguache County, CO`,description:`While driving south on Highway 17, four miles south of Mofatt, CO, I observed a bright silver reflection 45 degrees above the horizon directly south over Hooper. I estimated its distance at about 10 miles away. The object was only 12 degrees west of the sun and at that angle it had to have been round or rounded to reflect the morning sunlight. I observed it for 15 or so seconds before it blinked out. After 5 or 6 seconds it was back, however it seemed to be twice as far away. It hovered for another 5 or so seconds before disappearing extremely fast directly south. Candice Powers, a researcher from Denver, traveling in a car behind me also saw it when it first appeared. Richard Copeland, another witness, missed it.`},
+{id:"D102",lat:37.9964,lng:-105.6997,date:`March 6, 1994`,location:`Crestone, Saguache County, CO`,description:`Cheap firework display seen going from vertical E to W over Crestone. Described as “less than 100 feet above the ground.” Appeared to fall straight down, becoming visible well under the clouds.`},
+{id:"D103",lat:37.99,lng:-105.69,date:`March 6, 1994`,location:`Baca Development, Saguache County, CO`,description:`A red and blue light is reported by Isadora Storey hovering on the western horizon. When witness went to get someone to also look at it, it was gone.`},
+{id:"D104",lat:37.99,lng:-105.69,date:`March 2, 1994`,location:`Baca Development, Saguache County, CO`,description:`A witness, while visiting from Seattle, witnessed red lights over the Great Sand Dunes. A photographer, she said the lights “mezmerized her” and that she was unable to photograph the lights because she “felt paralyzed”.`},
+{id:"D105",lat:37.9964,lng:-105.6997,date:`February 4, 1994`,location:`Near Crestone, Saguache County, CO`,description:`2 reports of “cheap firework” displays. Both reports mentioned very low altitude of whitish-blue streaks near Crestone.`},
+{id:"D106",lat:38.0042,lng:-105.9061,date:`February 4, 1994`,location:`Mofatt, CO, Saguache County, CO`,description:`Swarm of glowing lights seen east of Moffat.`},
+{id:"D107",lat:37.9,lng:-105.5,date:`January 19/21, 1994`,location:`Over the Sangres, south of the Baca over Music Pass, Saguache-Huerfano County, CO`,description:`Multiple reports over three nights of two`}
+];
+
+// ══════════════════════════════════════════════════════════════
+//  DATA LAYER
+// ══════════════════════════════════════════════════════════════
+const DataStore = {
+  _key:'slv-ufo-user-reports',
+  load(){try{return JSON.parse(localStorage.getItem(this._key))||[];}catch(e){return[];}},
+  save(r){try{localStorage.setItem(this._key,JSON.stringify(r));}catch(e){}},
+  add(r){const a=this.load();a.push(r);this.save(a);return a;},
+  remove(id){const a=this.load().filter(r=>r.id!==id);this.save(a);return a;}
+};
+
+// ══════════════════════════════════════════════════════════════
+//  AI PROVIDER SYSTEM
+// ══════════════════════════════════════════════════════════════
+const PROVIDERS = {
+  openrouter_free: {
+    id: 'openrouter_free',
+    name: 'OpenRouter Free',
+    label: 'FREE',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    model: 'openrouter/free',
+    keyPrefix: 'sk-or-',
+    keyRequired: false,
+    keyUrl: 'https://openrouter.ai/settings/keys',
+    help: 'OpenRouter free tier — no key required, but adding one improves rate limits.',
+    headers: function(key) {
+      var h = {'Content-Type':'application/json','HTTP-Referer':location.href,'X-Title':'SLV UFO Map'};
+      if(key) h['Authorization'] = 'Bearer ' + key;
+      return h;
+    }
+  },
+  openrouter: {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    label: 'OPENROUTER',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    model: 'google/gemini-2.5-flash-lite-preview-06-17',
+    keyPrefix: 'sk-or-',
+    keyRequired: true,
+    keyUrl: 'https://openrouter.ai/settings/keys',
+    help: 'Use any model on OpenRouter with your API key. Default: Gemini 2.5 Flash Lite.',
+    headers: function(key) {
+      return {'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':location.href,'X-Title':'SLV UFO Map'};
+    }
+  },
+  openai: {
+    id: 'openai',
+    name: 'OpenAI',
+    label: 'OPENAI',
+    url: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o-mini',
+    keyPrefix: 'sk-',
+    keyRequired: true,
+    keyUrl: 'https://platform.openai.com/api-keys',
+    help: 'Use GPT-4o-mini or other OpenAI models. Requires an OpenAI API key.',
+    headers: function(key) {
+      return {'Content-Type':'application/json','Authorization':'Bearer '+key};
+    }
+  },
+  anthropic: {
+    id: 'anthropic',
+    name: 'Claude',
+    label: 'CLAUDE',
+    url: 'https://api.anthropic.com/v1/messages',
+    model: 'claude-sonnet-4-20250514',
+    keyPrefix: 'sk-ant-',
+    keyRequired: true,
+    keyUrl: 'https://console.anthropic.com/settings/keys',
+    help: 'Use Claude Sonnet or other Anthropic models. Requires an Anthropic API key.',
+    headers: function(key) {
+      return {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+    },
+    transformRequest: function(messages, model) {
+      // Anthropic uses a different format
+      var sys = messages.find(m => m.role === 'system');
+      var msgs = messages.filter(m => m.role !== 'system');
+      return { model: model, max_tokens: 1024, system: sys ? sys.content : '', messages: msgs };
+    },
+    transformResponse: function(data) {
+      if (data.content && data.content[0]) return data.content[0].text;
+      return 'No response.';
+    }
+  },
+  xai: {
+    id: 'xai',
+    name: 'Grok',
+    label: 'GROK',
+    url: 'https://api.x.ai/v1/chat/completions',
+    model: 'grok-3-mini-fast',
+    keyPrefix: 'xai-',
+    keyRequired: true,
+    keyUrl: 'https://console.x.ai',
+    help: 'Use Grok models from xAI. Requires an xAI API key.',
+    headers: function(key) {
+      return {'Content-Type':'application/json','Authorization':'Bearer '+key};
+    }
+  }
+};
+
+const AI = {
+  _provider: null,
+  _history: [],
+
+  getKey(provId) { return localStorage.getItem('slv-ai-key-' + provId) || ''; },
+  setKey(provId, k) { localStorage.setItem('slv-ai-key-' + provId, k); },
+  clearKey(provId) { localStorage.removeItem('slv-ai-key-' + provId); },
+  getLastProvider() { return localStorage.getItem('slv-ai-provider') || 'openrouter_free'; },
+  setLastProvider(id) { localStorage.setItem('slv-ai-provider', id); },
+
+  setProvider(id) {
+    this._provider = PROVIDERS[id];
+    this.setLastProvider(id);
+    document.getElementById('aiModelInfo').textContent = this._provider.name + ' — ' + this._provider.model;
+    document.getElementById('aiProvTag').textContent = this._provider.name + ' / ' + this._provider.model;
+    // Update active button
+    document.querySelectorAll('.prov-btn').forEach(function(el) { el.classList.toggle('active', el.dataset.prov === id); });
+  },
+
+  needsKey() {
+    if (!this._provider.keyRequired) return false;
+    return !this.getKey(this._provider.id);
+  },
+
+  buildSystemPrompt() {
+    var ctx = 'You are the SLV Sighting Analyst, an expert on UFO/UAP sightings in Colorado\'s San Luis Valley. You have access to ' + SIGHTINGS.length + ' documented sightings (1994-2019) from NUFORC, Christopher O\'Brien\'s field research, and community reports.\n\n';
+    ctx += 'INSTRUCTIONS: Reference specific sightings by date and location. Identify patterns, correlations, hotspots, and anomalies. Be analytical, thorough, and intellectually honest. When the data supports a conclusion, state it clearly. When it doesn\'t, say so.\n\n';
+    ctx += 'SIGHTING DATABASE:\n';
+    SIGHTINGS.forEach(function(s) {
+      ctx += s.id + ' | ' + s.date + ' | ' + s.location + ' | ' + s.description.substring(0, 300) + '\n';
+    });
+    return ctx;
+  },
+
+  async send(userMsg) {
+    var prov = this._provider;
+    var key = this.getKey(prov.id);
+    if (prov.keyRequired && !key) throw new Error('API key required for ' + prov.name);
+
+    this._history.push({ role: 'user', content: userMsg });
+
+    var messages = [
+      { role: 'system', content: this.buildSystemPrompt() },
+      ...this._history.slice(-12)
+    ];
+
+    var body;
+    if (prov.transformRequest) {
+      body = prov.transformRequest(messages, prov.model);
+    } else {
+      body = { model: prov.model, messages: messages, max_tokens: 1024, temperature: 0.7 };
+    }
+
+    var resp = await fetch(prov.url, {
+      method: 'POST',
+      headers: prov.headers(key),
+      body: JSON.stringify(body)
+    });
+
+    if (!resp.ok) {
+      var err = await resp.json().catch(function() { return {}; });
+      var msg = err.error?.message || err.error?.type || 'Request failed (' + resp.status + ')';
+      throw new Error(msg);
+    }
+
+    var data = await resp.json();
+    var reply;
+    if (prov.transformResponse) {
+      reply = prov.transformResponse(data);
+    } else {
+      reply = data.choices?.[0]?.message?.content || 'No response.';
+    }
+
+    this._history.push({ role: 'assistant', content: reply });
+    var usedModel = data.model || prov.model;
+    return { text: reply, model: usedModel };
+  },
+
+  reset() { this._history = []; }
+};
+
+// ══════════════════════════════════════════════════════════════
+//  APP STATE & MAP
+// ══════════════════════════════════════════════════════════════
+var map, docCluster, userCluster, userReports=[], formOpen=false, aiOpen=false;
+
+function initMap() {
+  map = L.map('map',{center:[37.65,-105.85],zoom:9,zoomControl:false});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri',maxZoom:18}).addTo(map);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,opacity:0.7}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  docCluster=mkC('#00ff66'); userCluster=mkC('#ff8c00');
+  map.addLayer(docCluster); map.addLayer(userCluster);
+  map.on('click',function(e){if(formOpen){document.getElementById('fLat').value=e.latlng.lat.toFixed(5);document.getElementById('fLng').value=e.latlng.lng.toFixed(5);}});
+  loadDoc(); userReports=DataStore.load(); loadUser(); updateCounts(); buildStats(); initAIPanel();
+}
+
+function mkC(c){return L.markerClusterGroup({maxClusterRadius:40,iconCreateFunction:function(cl){var n=cl.getChildCount(),px=n<10?36:n<30?44:52;return L.divIcon({html:'<div style="background:radial-gradient(circle,'+c+'E6 0%,'+c+'99 60%,'+c+'33 100%);width:'+px+'px;height:'+px+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:'+(px>44?16:13)+'px;font-family:monospace;box-shadow:0 0 15px '+c+'88;border:2px solid '+c+'CC;">'+n+'</div>',className:'',iconSize:[px,px]});}});}
+
+function loadDoc(){docCluster.clearLayers();SIGHTINGS.forEach(function(s){var ic=L.divIcon({html:'<div style="font-size:20px;text-align:center;line-height:26px;width:26px;height:26px;filter:drop-shadow(0 0 6px rgba(0,255,100,0.8));cursor:pointer;">&#x1F6F8;</div>',className:'',iconSize:[26,26],iconAnchor:[13,13]});var m=L.marker([s.lat,s.lng],{icon:ic});m.on('click',function(){showDetail(s,'doc');});docCluster.addLayer(m);});}
+
+function loadUser(){userCluster.clearLayers();userReports.forEach(function(s){var ic=L.divIcon({html:'<div style="font-size:18px;text-align:center;line-height:24px;width:24px;height:24px;filter:drop-shadow(0 0 6px rgba(255,140,0,0.8));cursor:pointer;position:relative;">&#x1F6F8;<div style="position:absolute;top:-5px;right:-5px;background:#ff8c00;color:#000;font-size:7px;font-weight:bold;border-radius:50%;width:12px;height:12px;display:flex;align-items:center;justify-content:center;">U</div></div>',className:'',iconSize:[24,24],iconAnchor:[12,12]});var m=L.marker([parseFloat(s.lat),parseFloat(s.lng)],{icon:ic});m.on('click',function(){showDetail(s,'user');});userCluster.addLayer(m);});}
+
+function showDetail(s,type){var p=document.getElementById('detailPanel');p.className='panel '+(type==='user'?'panel-user':'panel-doc')+' show';var t=document.getElementById('detailType');t.className='detail-type '+type;t.textContent=(type==='user'?'USER REPORT':'DOCUMENTED SIGHTING')+' — '+s.id;document.getElementById('detailLoc').textContent=s.location||'';var mh='<div><div class="meta-label">DATE</div><div class="meta-val">'+(s.date||'Unknown')+'</div></div>';if(s.shape)mh+='<div><div class="meta-label">SHAPE</div><div class="meta-val">'+s.shape+'</div></div>';if(s.duration)mh+='<div><div class="meta-label">DURATION</div><div class="meta-val">'+s.duration+'</div></div>';mh+='<div><div class="meta-label">COORDS</div><div class="meta-val sm">'+Number(s.lat).toFixed(3)+', '+Number(s.lng).toFixed(3)+'</div></div>';document.getElementById('detailMeta').innerHTML=mh;document.getElementById('detailDesc').textContent=s.description||s.summary||'No details.';var ft='';if(type==='user'){if(s.name)ft+='<div style="margin-top:8px;font-size:10px;opacity:.5">— '+s.name+(s.submittedAt?' ('+new Date(s.submittedAt).toLocaleDateString()+')':'')+'</div>';ft+='<button class="btn-delete" onclick="deleteReport(\''+s.id+'\')">Delete</button>';}document.getElementById('detailFooter').innerHTML=ft;document.getElementById('formPanel').classList.remove('show');document.getElementById('statsPanel').classList.remove('show');}
+function closeDetail(){document.getElementById('detailPanel').classList.remove('show');}
+
+function toggleForm(){formOpen=!formOpen;var p=document.getElementById('formPanel'),b=document.getElementById('btnReport');if(formOpen){p.classList.add('show');b.textContent='✕ CANCEL';b.classList.add('cancel');closeDetail();document.getElementById('statsPanel').classList.remove('show');}else{p.classList.remove('show');b.innerHTML='&#xFF0B; REPORT';b.classList.remove('cancel');}}
+
+function submitReport(){var lat=document.getElementById('fLat').value.trim(),lng=document.getElementById('fLng').value.trim(),desc=document.getElementById('fDesc').value.trim();if(!lat||!lng||!desc){alert('Coordinates and description required.');return;}var r={id:'U-'+Date.now(),lat:lat,lng:lng,location:document.getElementById('fLoc').value.trim(),date:document.getElementById('fDate').value.trim(),time:document.getElementById('fTime').value.trim(),duration:document.getElementById('fDur').value.trim(),shape:document.getElementById('fShape').value,description:desc,name:document.getElementById('fName').value.trim(),email:document.getElementById('fEmail').value.trim(),submittedAt:new Date().toISOString()};userReports=DataStore.add(r);loadUser();updateCounts();buildStats();['fLat','fLng','fLoc','fDate','fTime','fDur','fDesc','fName','fEmail'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('fShape').value='Unknown';toggleForm();showDetail(r,'user');map.setView([parseFloat(lat),parseFloat(lng)],12);}
+function deleteReport(id){if(!confirm('Delete?'))return;userReports=DataStore.remove(id);loadUser();updateCounts();buildStats();closeDetail();}
+function setTab(t){document.querySelectorAll('.tab').forEach(function(el){el.classList.toggle('active',el.dataset.tab===t);});closeDetail();document.getElementById('statsPanel').classList.toggle('show',t==='stats');}
+function updateCounts(){var d=SIGHTINGS.length,u=userReports.length;['docCount','docCountTab','legDoc','statDoc'].forEach(function(id){document.getElementById(id).textContent=d;});['userCount','userCountTab','legUser','statUser'].forEach(function(id){document.getElementById(id).textContent=u;});}
+function buildStats(){var bd={},tot=SIGHTINGS.length;SIGHTINGS.forEach(function(s){var m=s.date.match(/\d{4}/);if(m){var d=Math.floor(parseInt(m[0])/10)*10+'s';bd[d]=(bd[d]||0)+1;}});var h='';Object.keys(bd).sort().forEach(function(d){h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><div class="bar-label">'+d+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(bd[d]/tot*100).toFixed(1)+'%"></div></div><div class="bar-count">'+bd[d]+'</div></div>';});document.getElementById('decadeBars').innerHTML=h;}
+
+// ══════════════════════════════════════════════════════════════
+//  AI PANEL
+// ══════════════════════════════════════════════════════════════
+function initAIPanel() {
+  // Build provider buttons
+  var row = document.getElementById('providerRow');
+  var html = '';
+  Object.keys(PROVIDERS).forEach(function(id) {
+    var p = PROVIDERS[id];
+    html += '<button class="prov-btn" data-prov="' + id + '" onclick="selectProvider(\'' + id + '\')">' + p.label + '</button>';
+  });
+  row.innerHTML = html;
+
+  // Restore last provider
+  var lastProv = AI.getLastProvider();
+  selectProvider(lastProv, true);
+}
+
+function selectProvider(id, silent) {
+  AI.setProvider(id);
+  var prov = PROVIDERS[id];
+
+  // Check if key is needed
+  if (prov.keyRequired && !AI.getKey(id)) {
+    showKeyOverlay(id);
+  } else {
+    hideKeyOverlay();
+  }
+
+  if (!silent) {
+    AI.reset();
+    document.getElementById('aiMessages').innerHTML = '<div class="ai-msg system">Switched to ' + prov.name + ' (' + prov.model + '). Ask me anything about the ' + SIGHTINGS.length + ' documented SLV sightings.</div>';
+  }
+}
+
+function showKeyOverlay(provId) {
+  var prov = PROVIDERS[provId];
+  var ov = document.getElementById('keyOverlay');
+  ov.classList.remove('hidden');
+  document.getElementById('keyProvLabel').textContent = prov.name.toUpperCase() + ' API KEY';
+  document.getElementById('keyProvHelp').innerHTML = prov.help + '<br><a href="' + prov.keyUrl + '" target="_blank" style="color:var(--purple)">Get your key here &rarr;</a>';
+  document.getElementById('keyInput').value = '';
+  document.getElementById('keyInput').placeholder = prov.keyPrefix + '...';
+  document.getElementById('keySkipBtn').style.display = prov.keyRequired ? 'none' : 'inline';
+}
+
+function hideKeyOverlay() {
+  document.getElementById('keyOverlay').classList.add('hidden');
+}
+
+function saveKey() {
+  var key = document.getElementById('keyInput').value.trim();
+  if (!key) { alert('Please enter an API key.'); return; }
+  AI.setKey(AI._provider.id, key);
+  hideKeyOverlay();
+}
+
+function skipKey() { hideKeyOverlay(); }
+
+function changeKey() {
+  showKeyOverlay(AI._provider.id);
+}
+
+function toggleAI() {
+  aiOpen = !aiOpen;
+  var p = document.getElementById('aiPanel'), b = document.getElementById('btnAI');
+  if (aiOpen) {
+    p.classList.add('show'); b.textContent = '✕ CLOSE AI'; b.classList.add('active');
+    document.getElementById('legend').style.display = 'none';
+    document.getElementById('aiInput').focus();
+  } else {
+    p.classList.remove('show'); b.innerHTML = '&#x1F916; ASK AI'; b.classList.remove('active');
+    document.getElementById('legend').style.display = '';
+  }
+}
+
+function addMsg(role, text) {
+  var el = document.createElement('div');
+  el.className = 'ai-msg ' + role;
+  el.textContent = text;
+  document.getElementById('aiMessages').appendChild(el);
+  document.getElementById('aiMessages').scrollTop = 999999;
+  return el;
+}
+
+function clearChat() {
+  AI.reset();
+  document.getElementById('aiMessages').innerHTML = '<div class="ai-msg system">Chat cleared. Ready for new questions about the ' + SIGHTINGS.length + ' SLV sightings.</div>';
+}
+
+async function sendAI() {
+  var input = document.getElementById('aiInput');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  addMsg('user', msg);
+  var loadEl = addMsg('loading', 'Analyzing sighting data...');
+  document.getElementById('aiSendBtn').disabled = true;
+
+  try {
+    var result = await AI.send(msg);
+    loadEl.remove();
+    var el = addMsg('assistant', result.text);
+    // Show which model actually responded
+    if (result.model && result.model !== AI._provider.model) {
+      var tag = document.createElement('div');
+      tag.style.cssText = 'font-size:8px;opacity:.3;margin-top:4px;';
+      tag.textContent = 'via ' + result.model;
+      el.appendChild(tag);
+    }
+  } catch(e) {
+    loadEl.remove();
+    addMsg('error', 'Error: ' + e.message);
+    if (e.message.includes('401') || e.message.toLowerCase().includes('auth') || e.message.toLowerCase().includes('key')) {
+      addMsg('system', 'Key may be invalid or expired. Click the key icon below to re-enter.');
+    }
+  }
+  document.getElementById('aiSendBtn').disabled = false;
+  document.getElementById('aiInput').focus();
+}
+
+document.addEventListener('DOMContentLoaded', initMap);
+</script>
+</body>
+</html>
