@@ -72,8 +72,7 @@ The free tier requires no setup at all — anyone can open the dashboard and sta
 
 ## How To Use It
 
-### View the Live Dashboard
-Visit the hosted version (link coming soon) or open `index.html` in any modern web browser.
+### View the Live Dashboard [➡️ **View the Live Report**](https://jkh2.github.io/SLV-UFO-MAP/)
 
 ### Deploy Your Own Copy
 1. Fork or clone this repository
