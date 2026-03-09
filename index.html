@@ -270,6 +270,9 @@ body{font-family:'JetBrains Mono','Fira Code','Courier New',monospace;background
   <div class="legend-title">LEGEND</div>
   <div class="legend-row"><div class="legend-dot green"></div><span style="opacity:.7">Documented (<span id="legDoc">107</span>)</span></div>
   <div class="legend-row"><div class="legend-dot orange"></div><span style="opacity:.7">User Report (<span id="legUser">0</span>)</span></div>
+  <div style="margin-top:6px;border-top:1px solid rgba(255,255,255,.08);padding-top:5px">
+    <button id="muteBtn" onclick="toggleMute()" style="background:none;border:1px solid rgba(255,255,255,.12);color:#999;font-size:9px;font-family:inherit;cursor:pointer;padding:2px 8px;border-radius:3px;width:100%;transition:all .15s;">&#x1F50A; SOUND ON</button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -582,6 +585,11 @@ function initMap() {
   map.addLayer(docCluster); map.addLayer(userCluster);
   map.on('click',function(e){if(formOpen){document.getElementById('fLat').value=e.latlng.lat.toFixed(5);document.getElementById('fLng').value=e.latlng.lng.toFixed(5);}});
   loadDoc(); userReports=DataStore.load(); loadUser(); updateCounts(); buildStats(); initAIPanel();
+  // Play boot sequence on first user interaction (AudioContext requires gesture)
+  document.body.addEventListener('click', function _boot() {
+    SFX.bootSequence();
+    document.body.removeEventListener('click', _boot);
+  }, { once: true });
 }
 
 function mkC(c){return L.markerClusterGroup({maxClusterRadius:40,iconCreateFunction:function(cl){var n=cl.getChildCount(),px=n<10?36:n<30?44:52;return L.divIcon({html:'<div style="background:radial-gradient(circle,'+c+'E6 0%,'+c+'99 60%,'+c+'33 100%);width:'+px+'px;height:'+px+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:'+(px>44?16:13)+'px;font-family:monospace;box-shadow:0 0 15px '+c+'88;border:2px solid '+c+'CC;">'+n+'</div>',className:'',iconSize:[px,px]});}});}
@@ -590,14 +598,14 @@ function loadDoc(){docCluster.clearLayers();SIGHTINGS.forEach(function(s){var ic
 
 function loadUser(){userCluster.clearLayers();userReports.forEach(function(s){var ic=L.divIcon({html:'<div style="font-size:18px;text-align:center;line-height:24px;width:24px;height:24px;filter:drop-shadow(0 0 6px rgba(255,140,0,0.8));cursor:pointer;position:relative;">&#x1F6F8;<div style="position:absolute;top:-5px;right:-5px;background:#ff8c00;color:#000;font-size:7px;font-weight:bold;border-radius:50%;width:12px;height:12px;display:flex;align-items:center;justify-content:center;">U</div></div>',className:'',iconSize:[24,24],iconAnchor:[12,12]});var m=L.marker([parseFloat(s.lat),parseFloat(s.lng)],{icon:ic});m.on('click',function(){showDetail(s,'user');});userCluster.addLayer(m);});}
 
-function showDetail(s,type){var p=document.getElementById('detailPanel');p.className='panel '+(type==='user'?'panel-user':'panel-doc')+' show';var t=document.getElementById('detailType');t.className='detail-type '+type;t.textContent=(type==='user'?'USER REPORT':'DOCUMENTED SIGHTING')+' — '+s.id;document.getElementById('detailLoc').textContent=s.location||'';var mh='<div><div class="meta-label">DATE</div><div class="meta-val">'+(s.date||'Unknown')+'</div></div>';if(s.shape)mh+='<div><div class="meta-label">SHAPE</div><div class="meta-val">'+s.shape+'</div></div>';if(s.duration)mh+='<div><div class="meta-label">DURATION</div><div class="meta-val">'+s.duration+'</div></div>';mh+='<div><div class="meta-label">COORDS</div><div class="meta-val sm">'+Number(s.lat).toFixed(3)+', '+Number(s.lng).toFixed(3)+'</div></div>';document.getElementById('detailMeta').innerHTML=mh;document.getElementById('detailDesc').textContent=s.description||s.summary||'No details.';var ft='';if(type==='user'){if(s.name)ft+='<div style="margin-top:8px;font-size:10px;opacity:.5">— '+s.name+(s.submittedAt?' ('+new Date(s.submittedAt).toLocaleDateString()+')':'')+'</div>';ft+='<button class="btn-delete" onclick="deleteReport(\''+s.id+'\')">Delete</button>';}document.getElementById('detailFooter').innerHTML=ft;document.getElementById('formPanel').classList.remove('show');document.getElementById('statsPanel').classList.remove('show');}
-function closeDetail(){document.getElementById('detailPanel').classList.remove('show');}
+function showDetail(s,type){SFX.markerClick();var p=document.getElementById('detailPanel');p.className='panel '+(type==='user'?'panel-user':'panel-doc')+' show';var t=document.getElementById('detailType');t.className='detail-type '+type;t.textContent=(type==='user'?'USER REPORT':'DOCUMENTED SIGHTING')+' — '+s.id;document.getElementById('detailLoc').textContent=s.location||'';var mh='<div><div class="meta-label">DATE</div><div class="meta-val">'+(s.date||'Unknown')+'</div></div>';if(s.shape)mh+='<div><div class="meta-label">SHAPE</div><div class="meta-val">'+s.shape+'</div></div>';if(s.duration)mh+='<div><div class="meta-label">DURATION</div><div class="meta-val">'+s.duration+'</div></div>';mh+='<div><div class="meta-label">COORDS</div><div class="meta-val sm">'+Number(s.lat).toFixed(3)+', '+Number(s.lng).toFixed(3)+'</div></div>';document.getElementById('detailMeta').innerHTML=mh;document.getElementById('detailDesc').textContent=s.description||s.summary||'No details.';var ft='';if(type==='user'){if(s.name)ft+='<div style="margin-top:8px;font-size:10px;opacity:.5">— '+s.name+(s.submittedAt?' ('+new Date(s.submittedAt).toLocaleDateString()+')':'')+'</div>';ft+='<button class="btn-delete" onclick="deleteReport(\''+s.id+'\')">Delete</button>';}document.getElementById('detailFooter').innerHTML=ft;document.getElementById('formPanel').classList.remove('show');document.getElementById('statsPanel').classList.remove('show');}
+function closeDetail(){SFX.panelClose();document.getElementById('detailPanel').classList.remove('show');}
 
-function toggleForm(){formOpen=!formOpen;var p=document.getElementById('formPanel'),b=document.getElementById('btnReport');if(formOpen){p.classList.add('show');b.textContent='✕ CANCEL';b.classList.add('cancel');closeDetail();document.getElementById('statsPanel').classList.remove('show');}else{p.classList.remove('show');b.innerHTML='&#xFF0B; REPORT';b.classList.remove('cancel');}}
+function toggleForm(){formOpen=!formOpen;var p=document.getElementById('formPanel'),b=document.getElementById('btnReport');if(formOpen){SFX.panelOpen();p.classList.add('show');b.textContent='✕ CANCEL';b.classList.add('cancel');closeDetail();document.getElementById('statsPanel').classList.remove('show');}else{SFX.panelClose();p.classList.remove('show');b.innerHTML='&#xFF0B; REPORT';b.classList.remove('cancel');}}
 
-function submitReport(){var lat=document.getElementById('fLat').value.trim(),lng=document.getElementById('fLng').value.trim(),desc=document.getElementById('fDesc').value.trim();if(!lat||!lng||!desc){alert('Coordinates and description required.');return;}var r={id:'U-'+Date.now(),lat:lat,lng:lng,location:document.getElementById('fLoc').value.trim(),date:document.getElementById('fDate').value.trim(),time:document.getElementById('fTime').value.trim(),duration:document.getElementById('fDur').value.trim(),shape:document.getElementById('fShape').value,description:desc,name:document.getElementById('fName').value.trim(),email:document.getElementById('fEmail').value.trim(),submittedAt:new Date().toISOString()};userReports=DataStore.add(r);loadUser();updateCounts();buildStats();['fLat','fLng','fLoc','fDate','fTime','fDur','fDesc','fName','fEmail'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('fShape').value='Unknown';toggleForm();showDetail(r,'user');map.setView([parseFloat(lat),parseFloat(lng)],12);}
-function deleteReport(id){if(!confirm('Delete?'))return;userReports=DataStore.remove(id);loadUser();updateCounts();buildStats();closeDetail();}
-function setTab(t){document.querySelectorAll('.tab').forEach(function(el){el.classList.toggle('active',el.dataset.tab===t);});closeDetail();document.getElementById('statsPanel').classList.toggle('show',t==='stats');}
+function submitReport(){var lat=document.getElementById('fLat').value.trim(),lng=document.getElementById('fLng').value.trim(),desc=document.getElementById('fDesc').value.trim();if(!lat||!lng||!desc){alert('Coordinates and description required.');return;}var r={id:'U-'+Date.now(),lat:lat,lng:lng,location:document.getElementById('fLoc').value.trim(),date:document.getElementById('fDate').value.trim(),time:document.getElementById('fTime').value.trim(),duration:document.getElementById('fDur').value.trim(),shape:document.getElementById('fShape').value,description:desc,name:document.getElementById('fName').value.trim(),email:document.getElementById('fEmail').value.trim(),submittedAt:new Date().toISOString()};userReports=DataStore.add(r);SFX.submitSuccess();loadUser();updateCounts();buildStats();['fLat','fLng','fLoc','fDate','fTime','fDur','fDesc','fName','fEmail'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('fShape').value='Unknown';toggleForm();showDetail(r,'user');map.setView([parseFloat(lat),parseFloat(lng)],12);}
+function deleteReport(id){if(!confirm('Delete?'))return;SFX.deleteSound();userReports=DataStore.remove(id);loadUser();updateCounts();buildStats();closeDetail();}
+function setTab(t){SFX.tabSwitch();document.querySelectorAll('.tab').forEach(function(el){el.classList.toggle('active',el.dataset.tab===t);});closeDetail();document.getElementById('statsPanel').classList.toggle('show',t==='stats');}
 function updateCounts(){var d=SIGHTINGS.length,u=userReports.length;['docCount','docCountTab','legDoc','statDoc'].forEach(function(id){document.getElementById(id).textContent=d;});['userCount','userCountTab','legUser','statUser'].forEach(function(id){document.getElementById(id).textContent=u;});}
 function buildStats(){var bd={},tot=SIGHTINGS.length;SIGHTINGS.forEach(function(s){var m=s.date.match(/\d{4}/);if(m){var d=Math.floor(parseInt(m[0])/10)*10+'s';bd[d]=(bd[d]||0)+1;}});var h='';Object.keys(bd).sort().forEach(function(d){h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><div class="bar-label">'+d+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(bd[d]/tot*100).toFixed(1)+'%"></div></div><div class="bar-count">'+bd[d]+'</div></div>';});document.getElementById('decadeBars').innerHTML=h;}
 
@@ -621,6 +629,7 @@ function initAIPanel() {
 
 function selectProvider(id, silent) {
   AI.setProvider(id);
+  if (!silent) SFX.providerSwitch();
   var prov = PROVIDERS[id];
 
   // Check if key is needed
@@ -655,6 +664,7 @@ function saveKey() {
   var key = document.getElementById('keyInput').value.trim();
   if (!key) { alert('Please enter an API key.'); return; }
   AI.setKey(AI._provider.id, key);
+  SFX.connectSound();
   hideKeyOverlay();
 }
 
@@ -668,10 +678,12 @@ function toggleAI() {
   aiOpen = !aiOpen;
   var p = document.getElementById('aiPanel'), b = document.getElementById('btnAI');
   if (aiOpen) {
+    SFX.aiOpen();
     p.classList.add('show'); b.textContent = '✕ CLOSE AI'; b.classList.add('active');
     document.getElementById('legend').style.display = 'none';
     document.getElementById('aiInput').focus();
   } else {
+    SFX.aiClose();
     p.classList.remove('show'); b.innerHTML = '&#x1F916; ASK AI'; b.classList.remove('active');
     document.getElementById('legend').style.display = '';
   }
@@ -687,6 +699,7 @@ function addMsg(role, text) {
 }
 
 function clearChat() {
+  SFX.panelClose();
   AI.reset();
   document.getElementById('aiMessages').innerHTML = '<div class="ai-msg system">Chat cleared. Ready for new questions about the ' + SIGHTINGS.length + ' SLV sightings.</div>';
 }
@@ -698,12 +711,14 @@ async function sendAI() {
   input.value = '';
 
   addMsg('user', msg);
+  SFX.aiSend();
   var loadEl = addMsg('loading', 'Analyzing sighting data...');
   document.getElementById('aiSendBtn').disabled = true;
 
   try {
     var result = await AI.send(msg);
     loadEl.remove();
+    SFX.aiReceive();
     var el = addMsg('assistant', result.text);
     // Show which model actually responded
     if (result.model && result.model !== AI._provider.model) {
@@ -721,6 +736,444 @@ async function sendAI() {
   }
   document.getElementById('aiSendBtn').disabled = false;
   document.getElementById('aiInput').focus();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SFX ENGINE — Web Audio API Synthesizer
+//  Full sci-fi sound design, no external files
+// ══════════════════════════════════════════════════════════════
+const SFX = {
+  _ctx: null,
+  _muted: false,
+
+  init() {
+    // AudioContext requires user gesture to start on most browsers
+    // We'll lazy-init on first interaction
+  },
+
+  _ensureCtx() {
+    if (!this._ctx) {
+      this._ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (this._ctx.state === 'suspended') this._ctx.resume();
+    return this._ctx;
+  },
+
+  mute() { this._muted = true; },
+  unmute() { this._muted = false; },
+  isMuted() { return this._muted; },
+
+  // ── MARKER CLICK: Eerie radar ping with alien resonance ──
+  markerClick() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    // Main ping — descending ethereal tone
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1800, t);
+    osc.frequency.exponentialRampToValueAtTime(400, t + 0.4);
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1200, t);
+    filter.Q.setValueAtTime(8, t);
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.5);
+
+    // Harmonic shimmer
+    var osc2 = ctx.createOscillator();
+    var gain2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(2600, t);
+    osc2.frequency.exponentialRampToValueAtTime(600, t + 0.35);
+    gain2.gain.setValueAtTime(0.06, t);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(t);
+    osc2.stop(t + 0.4);
+
+    // Sub-bass thump
+    var osc3 = ctx.createOscillator();
+    var gain3 = ctx.createGain();
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(120, t);
+    osc3.frequency.exponentialRampToValueAtTime(40, t + 0.2);
+    gain3.gain.setValueAtTime(0.15, t);
+    gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    osc3.start(t);
+    osc3.stop(t + 0.25);
+  },
+
+  // ── TAB SWITCH: Quick electronic chirp ──
+  tabSwitch() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.setValueAtTime(1200, t + 0.04);
+    osc.frequency.setValueAtTime(1600, t + 0.08);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  },
+
+  // ── PANEL OPEN: Sci-fi airlock whoosh ──
+  panelOpen() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    // Rising sweep
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.25);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(200, t);
+    filter.frequency.exponentialRampToValueAtTime(3000, t + 0.25);
+    filter.Q.setValueAtTime(3, t);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.setValueAtTime(0.12, t + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+
+    // White noise whoosh
+    var bufferSize = ctx.sampleRate * 0.3;
+    var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+    var noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    var nGain = ctx.createGain();
+    var nFilter = ctx.createBiquadFilter();
+    nFilter.type = 'bandpass';
+    nFilter.frequency.setValueAtTime(1000, t);
+    nFilter.frequency.exponentialRampToValueAtTime(4000, t + 0.2);
+    nFilter.Q.setValueAtTime(1, t);
+    nGain.gain.setValueAtTime(0.08, t);
+    nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    noise.connect(nFilter);
+    nFilter.connect(nGain);
+    nGain.connect(ctx.destination);
+    noise.start(t);
+  },
+
+  // ── PANEL CLOSE: Reverse whoosh, descending ──
+  panelClose() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    var filter = ctx.createBiquadFilter();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(500, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 0.2);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2500, t);
+    filter.frequency.exponentialRampToValueAtTime(150, t + 0.25);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  },
+
+  // ── AI PANEL OPEN: Digital materialization with warble ──
+  aiOpen() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    // Ascending digital tones
+    [400, 600, 900, 1350].forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.07);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.setValueAtTime(0.1, t + i * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.07);
+      osc.stop(t + i * 0.07 + 0.15);
+    });
+
+    // Warble undertone
+    var lfo = ctx.createOscillator();
+    var lfoGain = ctx.createGain();
+    var carrier = ctx.createOscillator();
+    var cGain = ctx.createGain();
+    lfo.frequency.setValueAtTime(12, t);
+    lfoGain.gain.setValueAtTime(50, t);
+    carrier.type = 'triangle';
+    carrier.frequency.setValueAtTime(250, t);
+    cGain.gain.setValueAtTime(0.07, t);
+    cGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    lfo.connect(lfoGain);
+    lfoGain.connect(carrier.frequency);
+    carrier.connect(cGain);
+    cGain.connect(ctx.destination);
+    lfo.start(t);
+    carrier.start(t);
+    lfo.stop(t + 0.5);
+    carrier.stop(t + 0.5);
+  },
+
+  // ── AI PANEL CLOSE: Descending digital de-materialize ──
+  aiClose() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    [1200, 800, 500, 250].forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.06);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.setValueAtTime(0.08, t + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.06);
+      osc.stop(t + i * 0.06 + 0.12);
+    });
+  },
+
+  // ── SUBMIT SUCCESS: Triumphant ascending confirmation ──
+  submitSuccess() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    [523, 659, 784, 1047].forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.1);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.setValueAtTime(0.12, t + i * 0.1);
+      gain.gain.setValueAtTime(0.12, t + i * 0.1 + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.1);
+      osc.stop(t + i * 0.1 + 0.25);
+    });
+
+    // Shimmer layer
+    var osc2 = ctx.createOscillator();
+    var g2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(2093, t + 0.3);
+    g2.gain.setValueAtTime(0.05, t + 0.3);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+    osc2.connect(g2);
+    g2.connect(ctx.destination);
+    osc2.start(t + 0.3);
+    osc2.stop(t + 0.8);
+  },
+
+  // ── AI SEND: Quick transmission blip ──
+  aiSend() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.exponentialRampToValueAtTime(1400, t + 0.08);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  },
+
+  // ── AI RECEIVE: Incoming transmission tone ──
+  aiReceive() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1400, t);
+    osc.frequency.exponentialRampToValueAtTime(700, t + 0.15);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+
+    // Second softer tone
+    var osc2 = ctx.createOscillator();
+    var g2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(900, t + 0.1);
+    osc2.frequency.exponentialRampToValueAtTime(500, t + 0.25);
+    g2.gain.setValueAtTime(0.05, t + 0.1);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc2.connect(g2);
+    g2.connect(ctx.destination);
+    osc2.start(t + 0.1);
+    osc2.stop(t + 0.3);
+  },
+
+  // ── DELETE: Warning tone ──
+  deleteSound() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.setValueAtTime(200, t + 0.1);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  },
+
+  // ── CONNECT/KEY SAVED: Digital handshake ──
+  connectSound() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    [440, 554, 659].forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.08);
+      gain.gain.setValueAtTime(0.1, t + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.08);
+      osc.stop(t + i * 0.08 + 0.15);
+    });
+  },
+
+  // ── PROVIDER SWITCH: Quick mode-change blip ──
+  providerSwitch() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(500, t);
+    osc.frequency.setValueAtTime(800, t + 0.05);
+    osc.frequency.setValueAtTime(500, t + 0.1);
+    gain.gain.setValueAtTime(0.09, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  },
+
+  // ── BOOT SEQUENCE: Startup sound when page loads ──
+  bootSequence() {
+    if (this._muted) return;
+    var ctx = this._ensureCtx();
+    var t = ctx.currentTime;
+
+    // Low rumble
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(50, t);
+    osc.frequency.exponentialRampToValueAtTime(120, t + 0.8);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.12, t + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 1.0);
+
+    // Rising digital tones
+    [220, 330, 440, 660, 880].forEach(function(freq, i) {
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, t + 0.2 + i * 0.12);
+      g.gain.setValueAtTime(0, t);
+      g.gain.setValueAtTime(0.08, t + 0.2 + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2 + i * 0.12 + 0.3);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(t + 0.2 + i * 0.12);
+      o.stop(t + 0.2 + i * 0.12 + 0.3);
+    });
+
+    // Final shimmer
+    var s = ctx.createOscillator();
+    var sg = ctx.createGain();
+    s.type = 'triangle';
+    s.frequency.setValueAtTime(1760, t + 0.9);
+    sg.gain.setValueAtTime(0.05, t + 0.9);
+    sg.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+    s.connect(sg);
+    sg.connect(ctx.destination);
+    s.start(t + 0.9);
+    s.stop(t + 1.5);
+  }
+};
+
+// Mute toggle
+function toggleMute() {
+  var btn = document.getElementById('muteBtn');
+  if (SFX.isMuted()) {
+    SFX.unmute();
+    btn.innerHTML = '&#x1F50A; SOUND ON';
+    btn.style.color = '#999';
+    SFX.tabSwitch();
+  } else {
+    SFX.mute();
+    btn.innerHTML = '&#x1F507; SOUND OFF';
+    btn.style.color = '#555';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initMap);
