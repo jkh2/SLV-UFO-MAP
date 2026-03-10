@@ -275,6 +275,7 @@ body{font-family:'JetBrains Mono','Fira Code','Courier New',monospace;background
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 <script>
@@ -397,69 +398,65 @@ const SIGHTINGS = [
 const SUPABASE_URL = 'https://epetsbnjrpwoqdowagn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_OyHXc56u45ka3XZSuyp64A_ZkZ1cTWr';
 
-const DataStore = {
-  _headers(method) {
-    var h = {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': 'application/json'
-    };
-    if (method === 'POST') h['Prefer'] = 'return=representation';
-    return h;
-  },
+// Load Supabase JS client
+var _supabaseClient = null;
+function getSupabase() {
+  if (!_supabaseClient && window.supabase) {
+    _supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  return _supabaseClient;
+}
 
+const DataStore = {
   async load() {
     try {
-      var resp = await fetch(SUPABASE_URL + '/rest/v1/user_sightings?order=submitted_at.desc', {
-        headers: this._headers('GET')
-      });
-      if (!resp.ok) throw new Error('Load failed: ' + resp.status);
-      return await resp.json();
+      var sb = getSupabase();
+      if (!sb) { console.error('Supabase client not loaded'); return []; }
+      var { data, error } = await sb.from('user_sightings').select('*').order('submitted_at', { ascending: false });
+      if (error) { console.error('Supabase load error:', error); return []; }
+      return data || [];
     } catch(e) {
-      console.error('Supabase load error:', e);
+      console.error('DataStore load error:', e);
       return [];
     }
   },
 
   async add(report) {
     try {
-      var resp = await fetch(SUPABASE_URL + '/rest/v1/user_sightings', {
-        method: 'POST',
-        headers: this._headers('POST'),
-        body: JSON.stringify({
-          id: report.id,
-          lat: report.lat,
-          lng: report.lng,
-          location: report.location || '',
-          date: report.date || '',
-          time: report.time || '',
-          duration: report.duration || '',
-          shape: report.shape || 'Unknown',
-          description: report.description,
-          name: report.name || '',
-          email: report.email || '',
-          submitted_at: report.submittedAt || new Date().toISOString()
-        })
+      var sb = getSupabase();
+      if (!sb) throw new Error('Supabase client not loaded');
+      var { error } = await sb.from('user_sightings').insert({
+        id: report.id,
+        lat: report.lat,
+        lng: report.lng,
+        location: report.location || '',
+        date: report.date || '',
+        time: report.time || '',
+        duration: report.duration || '',
+        shape: report.shape || 'Unknown',
+        description: report.description,
+        name: report.name || '',
+        email: report.email || '',
+        submitted_at: report.submittedAt || new Date().toISOString()
       });
-      if (!resp.ok) throw new Error('Insert failed: ' + resp.status);
+      if (error) { console.error('Supabase insert error:', error); alert('Failed to save: ' + error.message); }
       return await this.load();
     } catch(e) {
-      console.error('Supabase add error:', e);
-      alert('Failed to save report to database. Please try again.');
+      console.error('DataStore add error:', e);
+      alert('Failed to save report. Please try again.');
       return await this.load();
     }
   },
 
   async remove(id) {
     try {
-      var resp = await fetch(SUPABASE_URL + '/rest/v1/user_sightings?id=eq.' + encodeURIComponent(id), {
-        method: 'DELETE',
-        headers: this._headers('DELETE')
-      });
-      if (!resp.ok) throw new Error('Delete failed: ' + resp.status);
+      var sb = getSupabase();
+      if (!sb) throw new Error('Supabase client not loaded');
+      var { error } = await sb.from('user_sightings').delete().eq('id', id);
+      if (error) console.error('Supabase delete error:', error);
       return await this.load();
     } catch(e) {
-      console.error('Supabase delete error:', e);
+      console.error('DataStore delete error:', e);
       return await this.load();
     }
   }
