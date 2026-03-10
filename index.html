@@ -395,7 +395,7 @@ const SIGHTINGS = [
 // ══════════════════════════════════════════════════════════════
 //  DATA LAYER — Supabase (shared user reports)
 // ══════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://epetsbnjrpwoqdowagn.supabase.co';
+const SUPABASE_URL = 'https://epetsbnjfrpwoqdowagn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_OyHXc56u45ka3XZSuyp64A_ZkZ1cTWr';
 
 // Load Supabase JS client
@@ -413,7 +413,7 @@ const DataStore = {
       var sb = getSupabase();
       if (!sb) { console.error('Supabase client not loaded'); return []; }
       var { data, error } = await sb.from('user_sightings').select('*').order('submitted_at', { ascending: false });
-      if (error) { console.error('Supabase load error:', error); return []; }
+      if (error) { console.error('Supabase load error:', JSON.stringify(error)); return []; }
       return data || [];
     } catch(e) {
       console.error('DataStore load error:', e);
@@ -439,7 +439,7 @@ const DataStore = {
         email: report.email || '',
         submitted_at: report.submittedAt || new Date().toISOString()
       });
-      if (error) { console.error('Supabase insert error:', error); alert('Failed to save: ' + error.message); }
+      if (error) { console.error('Supabase insert error:', JSON.stringify(error)); alert('Failed to save: ' + (error.message || JSON.stringify(error))); }
       return await this.load();
     } catch(e) {
       console.error('DataStore add error:', e);
@@ -453,7 +453,7 @@ const DataStore = {
       var sb = getSupabase();
       if (!sb) throw new Error('Supabase client not loaded');
       var { error } = await sb.from('user_sightings').delete().eq('id', id);
-      if (error) console.error('Supabase delete error:', error);
+      if (error) console.error('Supabase delete error:', JSON.stringify(error));
       return await this.load();
     } catch(e) {
       console.error('DataStore delete error:', e);
